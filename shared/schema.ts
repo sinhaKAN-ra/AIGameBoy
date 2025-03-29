@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, foreignKey } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, json, foreignKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -8,18 +8,30 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   email: text("email"),
+  isAdmin: boolean("is_admin").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// AI Model
+// AI Model (base model info)
 export const aiModels = pgTable("ai_models", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   company: text("company").notNull(),
+  description: text("description").notNull(),
+  logoUrl: text("logo_url"),
+  websiteUrl: text("website_url"),
+});
+
+// AI Model Versions
+export const modelVersions = pgTable("model_versions", {
+  id: serial("id").primaryKey(),
+  modelId: integer("model_id").references(() => aiModels.id).notNull(),
   version: text("version").notNull(),
+  releaseDate: timestamp("release_date").defaultNow(),
   description: text("description").notNull(),
   capabilities: text("capabilities"),
   imageUrl: text("image_url"),
+  isLatest: boolean("is_latest").default(false),
 });
 
 // Game
@@ -30,8 +42,10 @@ export const games = pgTable("games", {
   genre: text("genre").notNull(),
   imageUrl: text("image_url"),
   embedUrl: text("embed_url"),
-  aiModelId: integer("ai_model_id").references(() => aiModels.id),
+  modelVersionId: integer("model_version_id").references(() => modelVersions.id),
   active: boolean("active").default(true),
+  difficulty: text("difficulty").default("medium"),
+  tags: text("tags").array(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -52,6 +66,8 @@ export const insertUserSchema = createInsertSchema(users).pick({
 });
 
 export const insertAiModelSchema = createInsertSchema(aiModels);
+
+export const insertModelVersionSchema = createInsertSchema(modelVersions);
 
 export const insertGameSchema = createInsertSchema(games);
 
@@ -81,6 +97,9 @@ export type Login = z.infer<typeof loginSchema>;
 
 export type AiModel = typeof aiModels.$inferSelect;
 export type InsertAiModel = z.infer<typeof insertAiModelSchema>;
+
+export type ModelVersion = typeof modelVersions.$inferSelect;
+export type InsertModelVersion = z.infer<typeof insertModelVersionSchema>;
 
 export type Game = typeof games.$inferSelect;
 export type InsertGame = z.infer<typeof insertGameSchema>;

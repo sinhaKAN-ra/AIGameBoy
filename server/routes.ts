@@ -1,8 +1,8 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
-import { insertScoreSchema, scoreSubmissionSchema } from "@shared/schema";
+import { insertScoreSchema, scoreSubmissionSchema, User, Game } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -27,6 +27,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     res.json(model);
+  });
+  
+  // Model Versions API
+  app.get("/api/model-versions", async (_req, res) => {
+    const versions = await storage.getModelVersions();
+    res.json(versions);
+  });
+  
+  app.get("/api/model-versions/:id", async (req, res) => {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: "Invalid version ID" });
+    }
+    
+    const version = await storage.getModelVersion(id);
+    if (!version) {
+      return res.status(404).json({ message: "Model version not found" });
+    }
+    
+    res.json(version);
+  });
+  
+  app.get("/api/models/:id/versions", async (req, res) => {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: "Invalid model ID" });
+    }
+    
+    const versions = await storage.getModelVersionsByModelId(id);
+    res.json(versions);
+  });
+  
+  app.get("/api/models/:id/latest-version", async (req, res) => {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: "Invalid model ID" });
+    }
+    
+    const version = await storage.getLatestModelVersion(id);
+    if (!version) {
+      return res.status(404).json({ message: "No latest version found for this model" });
+    }
+    
+    res.json(version);
   });
 
   // Games API
@@ -58,6 +102,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const games = await storage.getGamesByModelId(id);
     res.json(games);
   });
+  
+  app.get("/api/model-versions/:id/games", async (req, res) => {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: "Invalid model version ID" });
+    }
+    
+    const games = await storage.getGamesByModelVersionId(id);
+    res.json(games);
+  });
 
   // Scores API
   app.get("/api/scores", async (_req, res) => {
@@ -76,7 +130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Join with user information
     const scoresWithUserInfo = await Promise.all(
       scores.map(async (score) => {
-        const user = await storage.getUser(score.userId);
+        const user = score.userId ? await storage.getUser(score.userId) : null;
         return {
           ...score,
           username: user?.username || "Unknown",
@@ -102,7 +156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Join with user information
     const scoresWithUserInfo = await Promise.all(
       scores.map(async (score) => {
-        const user = await storage.getUser(score.userId);
+        const user = score.userId ? await storage.getUser(score.userId) : null;
         return {
           ...score,
           username: user?.username || "Unknown",
@@ -128,18 +182,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Join with game information
     const scoresWithGameInfo = await Promise.all(
       scores.map(async (score) => {
-        const game = await storage.getGame(score.gameId);
+        const game = score.gameId ? await storage.getGame(score.gameId) : null;
         return {
           ...score,
-          game: game || { title: "Unknown Game" },
+          game: game || { 
+            title: "Unknown Game",
+            id: 0,
+            description: "",
+            genre: "",
+            imageUrl: null,
+            embedUrl: null,
+            modelVersionId: null,
+            active: false,
+            difficulty: null,
+            tags: null,
+            createdAt: null
+          } as Game,
         };
       })
     );
     
     // Sort by date, most recent first
-    scoresWithGameInfo.sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    scoresWithGameInfo.sort((a, b) => {
+      // Handle null dates by treating them as older than any actual date
+      if (!a.createdAt) return 1;
+      if (!b.createdAt) return -1;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
     
     res.json(scoresWithGameInfo);
   });

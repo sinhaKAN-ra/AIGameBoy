@@ -9,6 +9,10 @@ interface ExtendedGame extends Game {
   activePlayerCount?: number;
   growthPercentage?: number;
   aiModelName?: string;
+  // Added properties to match schema
+  modelVersionId: number | null;
+  difficulty: string | null;
+  tags: string[] | null;
 }
 
 const TrendingGames = () => {
@@ -23,12 +27,14 @@ const TrendingGames = () => {
       ...games?.[0] || { 
         id: 1, 
         title: "Pixel Adventure", 
-        description: "", 
-        genre: "", 
-        imageUrl: "", 
-        embedUrl: "", 
-        aiModelId: 1, 
-        active: true, 
+        description: "A retro-style adventure game", 
+        genre: "Adventure", 
+        imageUrl: null, 
+        embedUrl: null, 
+        modelVersionId: 1,
+        active: true,
+        difficulty: "medium",
+        tags: ["adventure", "retro"],
         createdAt: new Date()
       },
       activePlayerCount: 1200,
@@ -39,12 +45,14 @@ const TrendingGames = () => {
       ...games?.[1] || { 
         id: 2, 
         title: "AI Chess Master", 
-        description: "", 
-        genre: "", 
-        imageUrl: "", 
-        embedUrl: "", 
-        aiModelId: 2, 
-        active: true, 
+        description: "Play chess against an AI", 
+        genre: "Strategy", 
+        imageUrl: null, 
+        embedUrl: null, 
+        modelVersionId: 3,
+        active: true,
+        difficulty: "hard",
+        tags: ["chess", "strategy"],
         createdAt: new Date()
       },
       activePlayerCount: 3500,
@@ -55,12 +63,14 @@ const TrendingGames = () => {
       ...games?.[2] || { 
         id: 3, 
         title: "Space Explorer", 
-        description: "", 
-        genre: "", 
-        imageUrl: "", 
-        embedUrl: "", 
-        aiModelId: 3, 
-        active: true, 
+        description: "Explore procedurally generated galaxies", 
+        genre: "Simulation", 
+        imageUrl: null, 
+        embedUrl: null, 
+        modelVersionId: 5,
+        active: true,
+        difficulty: "medium",
+        tags: ["space", "exploration"],
         createdAt: new Date()
       },
       activePlayerCount: 950,
