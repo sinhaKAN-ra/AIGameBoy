@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Game Arcade | Play AI-Generated Games</title>
+    <meta name="description" content="Explore games created by leading AI models. Play, compete, and climb the leaderboards in this unique gaming experience!" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHJlY3QgeD0iMiIgeT0iMiIgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiByeD0iNCIgcnk9IjQiIGZpbGw9IiM4YzUyZmYiPjwvcmVjdD48dGV4dCB4PSI1LjUiIHk9IjE2IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtd2VpZ2h0PSJib2xkIiBmb250LXNpemU9IjEyIiBmaWxsPSJ3aGl0ZSI+QUk8L3RleHQ+PC9zdmc+" />
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+      /* Custom CRT effect styles */
+      .crt-lines::before {
+        content: "";
+        display: block;
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        right: 0;
+        background: linear-gradient(
+          rgba(18, 16, 16, 0) 50%,
+          rgba(0, 0, 0, 0.25) 50%
+        );
+        background-size: 100% 4px;
+        z-index: 9999;
+        pointer-events: none;
+        opacity: 0.15;
+      }
+      
+      /* Custom scrollbar */
+      ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+      
+      ::-webkit-scrollbar-track {
+        background: #121212;
+      }
+      
+      ::-webkit-scrollbar-thumb {
+        background: #8c52ff;
+        border-radius: 5px;
+      }
+      
+      ::-webkit-scrollbar-thumb:hover {
+        background: #ff5e7d;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- CRT screen effect overlay -->
+    <div class="crt-lines"></div>
+    
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
