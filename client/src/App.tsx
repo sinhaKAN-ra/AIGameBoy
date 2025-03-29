@@ -10,6 +10,7 @@ import Footer from "@/components/footer";
 import HomePage from "@/pages/home-page";
 import AuthPage from "@/pages/auth-page";
 import ModelsPage from "@/pages/models-page";
+import ModelDetailPage from "@/pages/model-detail-page";
 import GamesPage from "@/pages/games-page";
 import GameDetailPage from "@/pages/game-detail-page";
 import LeaderboardPage from "@/pages/leaderboard-page";
@@ -28,6 +29,7 @@ function Router() {
           <Route path="/" component={HomePage} />
           <Route path="/auth" component={AuthPage} />
           <Route path="/models" component={ModelsPage} />
+          <Route path="/models/:id" component={ModelDetailPage} />
           <Route path="/games" component={GamesPage} />
           <Route path="/games/:id" component={GameDetailPage} />
           <Route path="/leaderboard" component={LeaderboardPage} />

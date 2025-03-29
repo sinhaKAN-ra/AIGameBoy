@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useState } from "react";
 import { 
   Card, 
   CardContent, 
@@ -10,8 +11,15 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
-import { AiModel } from "@shared/schema";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Loader2, Info } from "lucide-react";
+import { AiModel, ModelVersion } from "@shared/schema";
 
 const ModelsPage = () => {
   const { data: models, isLoading, error } = useQuery<AiModel[]>({
@@ -88,25 +96,23 @@ const ModelsPage = () => {
               <CardHeader className="flex flex-row justify-between items-start pb-2">
                 <div>
                   <CardTitle className="font-pixel text-white">{model.name}</CardTitle>
-                  <CardDescription className="text-gray-400">{model.version}</CardDescription>
+                  <CardDescription className="text-gray-400">By {model.company}</CardDescription>
                 </div>
                 <Badge className="bg-[#ffc857] text-[#121212]">{model.company}</Badge>
               </CardHeader>
               <CardContent className="pb-2">
                 <p className="text-gray-300 mb-4">{model.description}</p>
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {model.capabilities?.split(',').map((capability, index) => (
-                    <Badge key={index} variant="outline" className="bg-primary/10 text-white">
-                      {capability.trim()}
-                    </Badge>
-                  ))}
+                  <Badge variant="outline" className="bg-primary/10 text-white">
+                    AI Model
+                  </Badge>
                 </div>
               </CardContent>
               <CardFooter className="pt-2 flex justify-between">
                 <span className="text-sm text-gray-400">Created by {model.company}</span>
                 <Link href={`/models/${model.id}`}>
                   <Button variant="default" size="sm" className="bg-primary hover:bg-opacity-90">
-                    View Games
+                    View Model Details
                   </Button>
                 </Link>
               </CardFooter>
