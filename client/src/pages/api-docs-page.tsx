@@ -57,7 +57,7 @@ export default function ApiDocsPage() {
   };
   
   // Example code snippets
-  const curlExample = `curl -X POST https://your-website.com/api/scores \\
+  const curlExample = `curl -X POST https://aigameboy.replit.app/api/scores \\
   -H "Content-Type: application/json" \\
   -d '{ 
     "gameId": 1, 
@@ -66,7 +66,7 @@ export default function ApiDocsPage() {
   }'`;
   
   const javascriptExample = `// Using fetch
-fetch('https://your-website.com/api/scores', {
+fetch('https://aigameboy.replit.app/api/scores', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json'
@@ -84,7 +84,7 @@ fetch('https://your-website.com/api/scores', {
   const pythonExample = `import requests
 
 response = requests.post(
-  'https://your-website.com/api/scores',
+  'https://aigameboy.replit.app/api/scores',
   json={
     'gameId': 1,
     'score': 1000,
@@ -100,7 +100,7 @@ using System.Text;
 
 public class ScoreSubmitter : MonoBehaviour
 {
-    [SerializeField] private string apiUrl = "https://your-website.com/api/scores";
+    [SerializeField] private string apiUrl = "https://aigameboy.replit.app/api/scores";
     [SerializeField] private string apiKey = "${apiKey || 'YOUR_API_KEY'}";
     [SerializeField] private int gameId = 1;
 
@@ -138,7 +138,7 @@ public class ScoreSubmitter : MonoBehaviour
     return (
       <div className="container mx-auto py-8">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold mb-6">API Documentation</h1>
+          <h1 className="text-3xl font-pixel text-white mb-6">AiGameBoy API Documentation</h1>
           <Card>
             <CardHeader>
               <CardTitle>Authentication Required</CardTitle>
@@ -158,7 +158,7 @@ public class ScoreSubmitter : MonoBehaviour
   return (
     <div className="container mx-auto py-8">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">AI Games API Documentation</h1>
+        <h1 className="text-3xl font-pixel text-white mb-6">AiGameBoy API Documentation</h1>
         
         <Card className="mb-8">
           <CardHeader>

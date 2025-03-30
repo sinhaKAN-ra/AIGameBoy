@@ -232,6 +232,76 @@ const AboutPage = () => {
           </Button>
         </div>
         
+        {/* Portfolio Section - Other Projects */}
+        <div className="mb-16">
+          <h2 className="font-pixel text-2xl text-white text-center mb-8">Our Other Projects</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {/* Project 1 */}
+            <Card className="bg-[#2a2a2a] border-gray-800 overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-1">
+              <div className="h-48 bg-gradient-to-br from-primary to-[#ff5e7d] flex items-center justify-center">
+                <Brain className="h-16 w-16 text-white" />
+              </div>
+              <CardContent className="p-6">
+                <h3 className="font-pixel text-white text-lg mb-2">Neural Studio</h3>
+                <p className="text-gray-400 text-sm mb-4">
+                  An interactive platform for visualizing neural networks and understanding AI model decision-making processes.
+                </p>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full">Machine Learning</span>
+                  <span className="text-xs bg-[#ff5e7d]/20 text-[#ff5e7d] px-2 py-1 rounded-full">Visualization</span>
+                  <span className="text-xs bg-[#ffc857]/20 text-[#ffc857] px-2 py-1 rounded-full">Education</span>
+                </div>
+                <Button variant="outline" size="sm" className="w-full border-primary text-primary hover:bg-primary/10">
+                  View Project
+                </Button>
+              </CardContent>
+            </Card>
+            
+            {/* Project 2 */}
+            <Card className="bg-[#2a2a2a] border-gray-800 overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-[#ff5e7d]/20 hover:-translate-y-1">
+              <div className="h-48 bg-gradient-to-br from-[#ff5e7d] to-[#ffc857] flex items-center justify-center">
+                <Sparkles className="h-16 w-16 text-white" />
+              </div>
+              <CardContent className="p-6">
+                <h3 className="font-pixel text-white text-lg mb-2">CreativeGen</h3>
+                <p className="text-gray-400 text-sm mb-4">
+                  A generative art platform where AI and human creativity collaborate to produce unique digital artwork and experiences.
+                </p>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full">Generative Art</span>
+                  <span className="text-xs bg-[#ff5e7d]/20 text-[#ff5e7d] px-2 py-1 rounded-full">Creative AI</span>
+                  <span className="text-xs bg-[#ffc857]/20 text-[#ffc857] px-2 py-1 rounded-full">NFT</span>
+                </div>
+                <Button variant="outline" size="sm" className="w-full border-[#ff5e7d] text-[#ff5e7d] hover:bg-[#ff5e7d]/10">
+                  View Project
+                </Button>
+              </CardContent>
+            </Card>
+            
+            {/* Project 3 */}
+            <Card className="bg-[#2a2a2a] border-gray-800 overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-[#ffc857]/20 hover:-translate-y-1">
+              <div className="h-48 bg-gradient-to-br from-[#ffc857] to-green-500 flex items-center justify-center">
+                <Gamepad2 className="h-16 w-16 text-white" />
+              </div>
+              <CardContent className="p-6">
+                <h3 className="font-pixel text-white text-lg mb-2">RetroSynth</h3>
+                <p className="text-gray-400 text-sm mb-4">
+                  A tool for recreating classic games with modern AI enhancements, preserving gaming history while adding new features.
+                </p>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full">Game Preservation</span>
+                  <span className="text-xs bg-[#ff5e7d]/20 text-[#ff5e7d] px-2 py-1 rounded-full">AI Enhancement</span>
+                  <span className="text-xs bg-green-500/20 text-green-500 px-2 py-1 rounded-full">Retro Gaming</span>
+                </div>
+                <Button variant="outline" size="sm" className="w-full border-[#ffc857] text-[#ffc857] hover:bg-[#ffc857]/10">
+                  View Project
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+        
         <Separator className="my-12 bg-gray-800" />
         
         <div className="text-center pb-8">
