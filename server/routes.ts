@@ -2,7 +2,15 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
-import { insertScoreSchema, scoreSubmissionSchema, User, Game } from "@shared/schema";
+import { 
+  insertScoreSchema, 
+  scoreSubmissionSchema, 
+  insertAiModelSchema,
+  insertModelVersionSchema,
+  insertGameSchema,
+  User, 
+  Game 
+} from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -27,6 +35,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     res.json(model);
+  });
+  
+  app.post("/api/models", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Validate the model data
+      const modelData = insertAiModelSchema.parse(req.body);
+      
+      // Create the model
+      const model = await storage.createAiModel(modelData);
+      
+      res.status(201).json(model);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid model data", errors: error.errors });
+      }
+      
+      console.error("Error creating model:", error);
+      res.status(500).json({ message: "Failed to create model" });
+    }
   });
   
   // Model Versions API
@@ -72,6 +104,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     res.json(version);
   });
+  
+  app.post("/api/model-versions", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Validate the model version data
+      const versionData = insertModelVersionSchema.parse(req.body);
+      
+      // Check if the model exists
+      const model = await storage.getAiModel(versionData.modelId);
+      if (!model) {
+        return res.status(404).json({ message: "AI Model not found" });
+      }
+      
+      // Create the model version
+      const version = await storage.createModelVersion(versionData);
+      
+      // If this is set as the latest version, update other versions
+      if (versionData.isLatest) {
+        await storage.setLatestModelVersion(version.id);
+      }
+      
+      res.status(201).json(version);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid model version data", errors: error.errors });
+      }
+      
+      console.error("Error creating model version:", error);
+      res.status(500).json({ message: "Failed to create model version" });
+    }
+  });
 
   // Games API
   app.get("/api/games", async (_req, res) => {
@@ -111,6 +178,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     const games = await storage.getGamesByModelVersionId(id);
     res.json(games);
+  });
+  
+  app.post("/api/games", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Validate the game data
+      const gameData = insertGameSchema.parse(req.body);
+      
+      // Check if the model version exists
+      if (gameData.modelVersionId) {
+        const modelVersion = await storage.getModelVersion(gameData.modelVersionId);
+        if (!modelVersion) {
+          return res.status(404).json({ message: "Model version not found" });
+        }
+      }
+      
+      // Create the game
+      const game = await storage.createGame(gameData);
+      
+      res.status(201).json(game);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid game data", errors: error.errors });
+      }
+      
+      console.error("Error creating game:", error);
+      res.status(500).json({ message: "Failed to create game" });
+    }
   });
 
   // Scores API

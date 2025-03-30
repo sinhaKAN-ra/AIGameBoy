@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { useLocation } from "wouter";
 import { 
   Card, 
   CardContent, 
@@ -15,8 +16,11 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Trophy, Calendar, Clock, Gamepad, Eye, Edit, Settings, Medal } from "lucide-react";
+import { Loader2, Trophy, Calendar, Clock, Gamepad, Eye, Edit, Settings, Medal, PlusCircle, Cpu, Code } from "lucide-react";
 import { Game } from "@shared/schema";
+import CreateModelForm from "@/components/create-model-form";
+import CreateVersionForm from "@/components/create-version-form";
+import CreateGameForm from "@/components/create-game-form";
 
 interface ScoreWithGame {
   id: number;
@@ -237,6 +241,9 @@ const ProfilePage = () => {
               <TabsList className="bg-[#2a2a2a] mb-2">
                 <TabsTrigger value="history">Game History</TabsTrigger>
                 <TabsTrigger value="favorites">Favorite Games</TabsTrigger>
+                <TabsTrigger value="create-model">Create Model</TabsTrigger>
+                <TabsTrigger value="create-version">Create Version</TabsTrigger>
+                <TabsTrigger value="create-game">Create Game</TabsTrigger>
               </TabsList>
               
               <TabsContent value="history">
@@ -320,6 +327,93 @@ const ProfilePage = () => {
                         <a href="/games">Browse Games</a>
                       </Button>
                     </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              
+              <TabsContent value="create-model">
+                <Card className="bg-[#2a2a2a] border-gray-800">
+                  <CardHeader>
+                    <CardTitle className="font-pixel text-white">Create AI Model</CardTitle>
+                    <CardDescription>
+                      Add a new AI model to showcase in the directory
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="p-4 bg-[#121212] rounded-lg mb-6">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center">
+                          <Cpu className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-white font-medium">What is an AI Model?</p>
+                        </div>
+                      </div>
+                      <p className="text-gray-400 text-sm">
+                        An AI model represents a specific AI system like GPT-4, Claude, or DALL-E. 
+                        Add basic information about the model here, then create specific versions with the "Create Version" tab.
+                      </p>
+                    </div>
+                    
+                    <CreateModelForm />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              
+              <TabsContent value="create-version">
+                <Card className="bg-[#2a2a2a] border-gray-800">
+                  <CardHeader>
+                    <CardTitle className="font-pixel text-white">Create Model Version</CardTitle>
+                    <CardDescription>
+                      Add a new version for an existing AI model
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="p-4 bg-[#121212] rounded-lg mb-6">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="h-10 w-10 rounded-full bg-[#ffc857] flex items-center justify-center">
+                          <Code className="h-5 w-5 text-[#121212]" />
+                        </div>
+                        <div>
+                          <p className="text-white font-medium">What is a Model Version?</p>
+                        </div>
+                      </div>
+                      <p className="text-gray-400 text-sm">
+                        Model versions represent specific iterations or releases of an AI model (e.g., GPT-4 vs GPT-4 Turbo).
+                        First create an AI model, then add one or more versions to it. Different versions can create different games.
+                      </p>
+                    </div>
+                    
+                    <CreateVersionForm />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              
+              <TabsContent value="create-game">
+                <Card className="bg-[#2a2a2a] border-gray-800">
+                  <CardHeader>
+                    <CardTitle className="font-pixel text-white">Create Game</CardTitle>
+                    <CardDescription>
+                      Add a new game created by an AI model version
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="p-4 bg-[#121212] rounded-lg mb-6">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="h-10 w-10 rounded-full bg-[#ff5e7d] flex items-center justify-center">
+                          <Gamepad className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-white font-medium">Adding a New Game</p>
+                        </div>
+                      </div>
+                      <p className="text-gray-400 text-sm">
+                        You can add games that were created by a specific AI model version. Make sure you've created the model
+                        and version first. The game URL should point to where the game can be played online.
+                      </p>
+                    </div>
+                    
+                    <CreateGameForm />
                   </CardContent>
                 </Card>
               </TabsContent>
