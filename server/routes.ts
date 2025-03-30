@@ -12,6 +12,7 @@ import {
   Game 
 } from "@shared/schema";
 import { z } from "zod";
+import crypto from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication
@@ -198,10 +199,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Credit check - user needs credits to create a game
+      const userId = req.user!.id;
+      const userCredits = await storage.getUserCredits(userId);
+      
+      if (userCredits < 1) {
+        return res.status(403).json({ 
+          message: "Insufficient credits. You need at least 1 credit to create a game.",
+          credits: userCredits 
+        });
+      }
+      
       // Create the game
       const game = await storage.createGame(gameData);
       
-      res.status(201).json(game);
+      // Deduct one credit from the user
+      const newCredits = Math.max(0, userCredits - 1); // Ensure we don't go below 0
+      await storage.updateUserCredits(userId, newCredits);
+      
+      res.status(201).json({
+        game,
+        credits: newCredits
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid game data", errors: error.errors });
@@ -318,16 +337,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate the score submission
       const validatedData = scoreSubmissionSchema.parse(req.body);
       
-      // Check if user is authenticated or has a valid API key
-      if (!req.isAuthenticated() && !validatedData.apiKey) {
-        return res.status(401).json({ message: "Authentication required" });
-      }
-      
       // Get user ID from session or find by API key
-      const userId = req.user?.id;
+      let userId = null;
       
-      if (!userId) {
-        return res.status(401).json({ message: "User not found" });
+      if (req.isAuthenticated() && req.user) {
+        // If the user is logged in, use their ID
+        userId = req.user.id;
+      } else if (validatedData.apiKey) {
+        // If an API key is provided, validate it and get the associated user ID
+        userId = await storage.validateApiKey(validatedData.apiKey);
+        
+        if (!userId) {
+          return res.status(401).json({ message: "Invalid API key" });
+        }
+      } else {
+        return res.status(401).json({ message: "Authentication required. Provide an API key or login" });
       }
       
       // Verify the game exists
@@ -345,6 +369,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const score = await storage.createScore(scoreData);
       
+      // Reward the user with a small credit for playing the game (1 in 5 chance)
+      if (Math.random() < 0.2) { // 20% chance to get a credit
+        const user = await storage.getUser(userId);
+        if (user) {
+          const newCredits = (user.credits || 0) + 1;
+          await storage.updateUserCredits(userId, newCredits);
+        }
+      }
+      
       res.status(201).json(score);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -356,6 +389,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User API key management
+  app.get("/api/user/api-key", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    
+    const userId = req.user!.id;
+    let apiKey = await storage.getUserApiKey(userId);
+    
+    if (!apiKey) {
+      // Create a new API key if one doesn't exist
+      apiKey = await storage.createUserApiKey(userId);
+    }
+    
+    res.json({ apiKey });
+  });
+  
+  app.post("/api/user/api-key/regenerate", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    
+    const userId = req.user!.id;
+    const apiKey = await storage.createUserApiKey(userId);
+    
+    res.json({ apiKey });
+  });
+  
+  // User credits management
+  app.get("/api/user/credits", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    
+    const userId = req.user!.id;
+    const credits = await storage.getUserCredits(userId);
+    
+    res.json({ credits });
+  });
+  
+  // This would be connected to a payment system in a real implementation
+  app.post("/api/user/credits/purchase", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    
+    const userId = req.user!.id;
+    const amount = Number(req.body.amount);
+    
+    if (isNaN(amount) || amount <= 0) {
+      return res.status(400).json({ message: "Invalid credit amount" });
+    }
+    
+    const currentCredits = await storage.getUserCredits(userId);
+    const newCredits = currentCredits + amount;
+    
+    await storage.updateUserCredits(userId, newCredits);
+    
+    res.json({ 
+      message: `Successfully purchased ${amount} credits`,
+      credits: newCredits
+    });
+  });
+  
   const httpServer = createServer(app);
   return httpServer;
 }

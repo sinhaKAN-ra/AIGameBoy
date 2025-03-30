@@ -9,6 +9,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   email: text("email"),
   isAdmin: boolean("is_admin").default(false),
+  credits: integer("credits").default(5),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

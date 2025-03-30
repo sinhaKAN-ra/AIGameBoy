@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu, X, User, Trophy, LogOut } from "lucide-react";
+import { Menu, X, User, Trophy, LogOut, Code } from "lucide-react";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -55,6 +55,9 @@ const Navbar = () => {
             </Link>
             <Link href="/about" className={`text-white hover:text-accent ${location === '/about' ? 'text-accent' : ''} font-medium`}>
               About
+            </Link>
+            <Link href="/api-docs" className={`text-white hover:text-accent ${location === '/api-docs' ? 'text-accent' : ''} font-medium`}>
+              <Code className="inline-block mr-1 h-4 w-4" /> API
             </Link>
             
             {user ? (
@@ -130,6 +133,9 @@ const Navbar = () => {
             </Link>
             <Link href="/about" className="block px-3 py-2 rounded-md text-base font-medium text-white hover:bg-primary">
               About
+            </Link>
+            <Link href="/api-docs" className="block px-3 py-2 rounded-md text-base font-medium text-white hover:bg-primary">
+              <Code className="inline mr-1 h-4 w-4" /> API
             </Link>
             
             {user ? (

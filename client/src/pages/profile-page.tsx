@@ -16,8 +16,13 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Trophy, Calendar, Clock, Gamepad, Eye, Edit, Settings, Medal, PlusCircle, Cpu, Code } from "lucide-react";
+import { 
+  Loader2, Trophy, Calendar, Clock, Gamepad, Eye, Edit, Settings, 
+  Medal, PlusCircle, Cpu, Code, Copy, Check, CreditCard, RefreshCw
+} from "lucide-react";
 import { Game } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import CreateModelForm from "@/components/create-model-form";
 import CreateVersionForm from "@/components/create-version-form";
 import CreateGameForm from "@/components/create-game-form";
@@ -35,7 +40,12 @@ interface ScoreWithGame {
 
 const ProfilePage = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [gameCount, setGameCount] = useState(0);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
+  const [purchasingCredits, setPurchasingCredits] = useState(false);
+  const [purchaseAmount, setPurchaseAmount] = useState(5);
 
   const { data: userScores, isLoading: scoresLoading } = useQuery<ScoreWithGame[]>({
     queryKey: [`/api/users/${user?.id}/scores`],
@@ -45,8 +55,85 @@ const ProfilePage = () => {
   const { data: games, isLoading: gamesLoading } = useQuery<Game[]>({
     queryKey: ['/api/games'],
   });
+  
+  // Fetch user credits
+  const { 
+    data: creditsData,
+    isLoading: creditsLoading,
+    refetch: refetchCredits
+  } = useQuery<{ credits: number }>({
+    queryKey: ['/api/user/credits'],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/user/credits");
+      return await res.json();
+    },
+    enabled: !!user,
+  });
+  
+  // Fetch user's API key
+  const { 
+    data: apiKeyData, 
+    isLoading: apiKeyLoading,
+    refetch: refetchApiKey
+  } = useQuery<{ apiKey: string }>({
+    queryKey: ['/api/user/api-key'],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/user/api-key");
+      return await res.json();
+    },
+    enabled: !!user,
+  });
+  
+  const apiKey = apiKeyData?.apiKey;
+  const credits = creditsData?.credits || 0;
 
-  const isLoading = scoresLoading || gamesLoading;
+  const isLoading = scoresLoading || gamesLoading || creditsLoading || apiKeyLoading;
+  
+  const handleCopy = (text: string, type: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(type);
+    setTimeout(() => setCopied(null), 2000);
+  };
+  
+  const handleRegenerateKey = async () => {
+    try {
+      setRegenerating(true);
+      await apiRequest("POST", "/api/user/api-key/regenerate");
+      await refetchApiKey();
+      toast({
+        title: "API Key Regenerated",
+        description: "Your new API key has been created successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to regenerate API key.",
+        variant: "destructive",
+      });
+    } finally {
+      setRegenerating(false);
+    }
+  };
+  
+  const handlePurchaseCredits = async () => {
+    try {
+      setPurchasingCredits(true);
+      await apiRequest("POST", "/api/user/credits/purchase", { amount: purchaseAmount });
+      await refetchCredits();
+      toast({
+        title: "Credits Purchased",
+        description: `Successfully purchased ${purchaseAmount} credits.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to purchase credits.",
+        variant: "destructive",
+      });
+    } finally {
+      setPurchasingCredits(false);
+    }
+  };
 
   // Calculate stats
   const totalScore = userScores?.reduce((sum, score) => sum + score.score, 0) || 0;
@@ -241,6 +328,8 @@ const ProfilePage = () => {
               <TabsList className="bg-[#2a2a2a] mb-2">
                 <TabsTrigger value="history">Game History</TabsTrigger>
                 <TabsTrigger value="favorites">Favorite Games</TabsTrigger>
+                <TabsTrigger value="api-key">API Key</TabsTrigger>
+                <TabsTrigger value="credits">Credits</TabsTrigger>
                 <TabsTrigger value="create-model">Create Model</TabsTrigger>
                 <TabsTrigger value="create-version">Create Version</TabsTrigger>
                 <TabsTrigger value="create-game">Create Game</TabsTrigger>
@@ -327,6 +416,183 @@ const ProfilePage = () => {
                         <a href="/games">Browse Games</a>
                       </Button>
                     </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              
+              <TabsContent value="api-key">
+                <Card className="bg-[#2a2a2a] border-gray-800">
+                  <CardHeader>
+                    <CardTitle className="font-pixel text-white">Your API Key</CardTitle>
+                    <CardDescription>
+                      Use this API key to submit scores from your games
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {apiKeyLoading ? (
+                      <div className="flex justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      </div>
+                    ) : (
+                      <>
+                        <div className="p-4 bg-[#121212] rounded-lg mb-6">
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="h-10 w-10 rounded-full bg-[#ffc857] flex items-center justify-center">
+                              <Code className="h-5 w-5 text-[#121212]" />
+                            </div>
+                            <div>
+                              <p className="text-white font-medium">What is an API Key?</p>
+                            </div>
+                          </div>
+                          <p className="text-gray-400 text-sm">
+                            Your API key allows games to submit scores on your behalf. Keep it secure and never share it publicly.
+                            Use it in your game code when sending score data to our API.
+                          </p>
+                        </div>
+                        
+                        <div className="bg-[#121212] p-4 rounded-lg mb-6 relative overflow-hidden">
+                          <p className="text-xs text-gray-400 mb-2">Your API Key:</p>
+                          <div className="flex items-center justify-between">
+                            <code className="font-mono text-white break-all mr-2">{apiKey || 'Loading...'}</code>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="shrink-0"
+                              onClick={() => apiKey && handleCopy(apiKey, 'apiKey')}
+                              disabled={!apiKey}
+                            >
+                              {copied === 'apiKey' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col space-y-4">
+                          <Button 
+                            onClick={handleRegenerateKey} 
+                            disabled={regenerating}
+                            className="w-full"
+                          >
+                            {regenerating ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Regenerating...
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                                Regenerate API Key
+                              </>
+                            )}
+                          </Button>
+                          
+                          <p className="text-sm text-amber-500">
+                            <b>Warning:</b> Regenerating your API key will invalidate the current key.
+                            Any applications using your old key will need to be updated.
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                  <CardFooter>
+                    <Button variant="outline" asChild className="w-full">
+                      <a href="/api-docs">
+                        <Code className="mr-2 h-4 w-4" />
+                        View API Documentation
+                      </a>
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </TabsContent>
+              
+              <TabsContent value="credits">
+                <Card className="bg-[#2a2a2a] border-gray-800">
+                  <CardHeader>
+                    <CardTitle className="font-pixel text-white">Game Credits</CardTitle>
+                    <CardDescription>
+                      Use credits to create games from AI models
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {creditsLoading ? (
+                      <div className="flex justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      </div>
+                    ) : (
+                      <>
+                        <div className="p-6 bg-[#121212] rounded-lg mb-6 text-center">
+                          <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mb-4 mx-auto">
+                            <CreditCard className="h-8 w-8 text-white" />
+                          </div>
+                          <h3 className="font-pixel text-white mb-2">Current Balance</h3>
+                          <p className="text-4xl font-pixel text-green-500 mb-2">{credits}</p>
+                          <p className="text-gray-400 text-sm">
+                            Credits are used each time you create a new game
+                          </p>
+                        </div>
+                        
+                        <div className="p-4 bg-[#121212] rounded-lg mb-6">
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="h-10 w-10 rounded-full bg-[#ff5e7d] flex items-center justify-center">
+                              <Trophy className="h-5 w-5 text-white" />
+                            </div>
+                            <div>
+                              <p className="text-white font-medium">How to Earn Credits</p>
+                            </div>
+                          </div>
+                          <ul className="text-gray-400 text-sm space-y-2">
+                            <li className="flex items-start gap-2">
+                              <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center shrink-0 mt-0.5">
+                                <Check className="h-3 w-3 text-white" />
+                              </div>
+                              <span>Play games to earn credits randomly (20% chance on each submission)</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center shrink-0 mt-0.5">
+                                <Check className="h-3 w-3 text-white" />
+                              </div>
+                              <span>Purchase credits below (simulation only)</span>
+                            </li>
+                          </ul>
+                        </div>
+                        
+                        <div className="space-y-4">
+                          <h3 className="font-pixel text-white">Purchase Credits</h3>
+                          <div className="flex gap-2">
+                            {[5, 10, 20, 50].map(amount => (
+                              <Button 
+                                key={amount}
+                                variant={purchaseAmount === amount ? "default" : "outline"}
+                                onClick={() => setPurchaseAmount(amount)}
+                                className="flex-1"
+                              >
+                                {amount}
+                              </Button>
+                            ))}
+                          </div>
+                          
+                          <Button 
+                            className="w-full" 
+                            disabled={purchasingCredits}
+                            onClick={handlePurchaseCredits}
+                          >
+                            {purchasingCredits ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Processing...
+                              </>
+                            ) : (
+                              <>
+                                Purchase {purchaseAmount} Credits
+                              </>
+                            )}
+                          </Button>
+                          
+                          <p className="text-xs text-gray-400 text-center">
+                            Note: This is a simulation. No actual payment will be processed.
+                          </p>
+                        </div>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>

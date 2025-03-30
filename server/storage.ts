@@ -27,6 +27,8 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserAdmin(userId: number, isAdmin: boolean): Promise<User | undefined>;
+  getUserCredits(userId: number): Promise<number>;
+  updateUserCredits(userId: number, credits: number): Promise<User | undefined>;
   
   // AI Model methods
   getAiModels(): Promise<AiModel[]>;
@@ -45,6 +47,7 @@ export interface IStorage {
   getGames(): Promise<Game[]>;
   getGame(id: number): Promise<Game | undefined>;
   getGamesByModelVersionId(modelVersionId: number): Promise<Game[]>;
+  getGamesByUserId(userId: number): Promise<Game[]>;
   createGame(game: InsertGame): Promise<Game>;
   
   // Score methods
@@ -53,6 +56,11 @@ export interface IStorage {
   getScoresByUserId(userId: number): Promise<Score[]>;
   getTopScoresByGameId(gameId: number, limit: number): Promise<Score[]>;
   createScore(score: InsertScore): Promise<Score>;
+  
+  // API Key methods
+  getUserApiKey(userId: number): Promise<string | undefined>;
+  createUserApiKey(userId: number): Promise<string>;
+  validateApiKey(apiKey: string): Promise<number | undefined>; // Returns userId if valid
   
   // Session store
   sessionStore: any; // Using any to avoid session type errors
@@ -64,6 +72,7 @@ export class MemStorage implements IStorage {
   private modelVersions: Map<number, ModelVersion>;
   private games: Map<number, Game>;
   private scores: Map<number, Score>;
+  private apiKeys: Map<number, string>; // Map userId to API key
   
   currentUserId: number;
   currentModelId: number;
@@ -78,6 +87,7 @@ export class MemStorage implements IStorage {
     this.modelVersions = new Map();
     this.games = new Map();
     this.scores = new Map();
+    this.apiKeys = new Map();
     
     this.currentUserId = 1;
     this.currentModelId = 1;
@@ -336,10 +346,14 @@ export class MemStorage implements IStorage {
       password: "admin123", // In production, this would be hashed
       email: "admin@aigames.com",
       isAdmin: true,
+      credits: 100, // Admin gets lots of credits
       createdAt: new Date()
     };
     
     this.users.set(adminUser.id, adminUser);
+    
+    // Create API key for admin user
+    this.apiKeys.set(adminUser.id, "admin-api-key-" + Math.random().toString(36).substring(2, 15));
   }
 
   // User methods
@@ -361,10 +375,63 @@ export class MemStorage implements IStorage {
       id, 
       createdAt,
       isAdmin: false,
+      credits: 5, // New users get 5 credits
       email: insertUser.email || null
     };
     this.users.set(id, user);
+    
+    // Create an API key for the new user
+    this.createUserApiKey(id);
+    
     return user;
+  }
+  
+  async getUserCredits(userId: number): Promise<number> {
+    const user = await this.getUser(userId);
+    return user?.credits || 0;
+  }
+  
+  async updateUserCredits(userId: number, credits: number): Promise<User | undefined> {
+    const user = await this.getUser(userId);
+    if (!user) return undefined;
+    
+    const updatedUser: User = {
+      ...user,
+      credits
+    };
+    this.users.set(userId, updatedUser);
+    return updatedUser;
+  }
+  
+  async getGamesByUserId(userId: number): Promise<Game[]> {
+    // Get all games created by this user (for now, there's no userId in Game)
+    // In a real implementation, we'd add a createdBy field to Game
+    const userScores = await this.getScoresByUserId(userId);
+    const gameIds = [...new Set(userScores.map(score => score.gameId).filter(id => id !== null) as number[])];
+    
+    return Promise.all(gameIds.map(id => this.getGame(id as number)))
+      .then(games => games.filter(game => game !== undefined) as Game[]);
+  }
+  
+  async getUserApiKey(userId: number): Promise<string | undefined> {
+    return this.apiKeys.get(userId);
+  }
+  
+  async createUserApiKey(userId: number): Promise<string> {
+    // Generate a random API key
+    const apiKey = "user-" + userId + "-key-" + Math.random().toString(36).substring(2, 15);
+    this.apiKeys.set(userId, apiKey);
+    return apiKey;
+  }
+  
+  async validateApiKey(apiKey: string): Promise<number | undefined> {
+    // Find the user ID associated with this API key
+    for (const [userId, key] of this.apiKeys.entries()) {
+      if (key === apiKey) {
+        return userId;
+      }
+    }
+    return undefined;
   }
   
   async updateUserAdmin(userId: number, isAdmin: boolean): Promise<User | undefined> {
