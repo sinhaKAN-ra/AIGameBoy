@@ -10,12 +10,8 @@ import {
   insertGameSchema,
   insertAchievementSchema,
   User, 
-  Game,
-  Achievement,
-  InsertAchievement,
-  insertUserSchema,
   loginSchema
-} from "@shared/schema";
+} from "../shared/schema";
 import { z } from "zod";
 import crypto from "crypto";
 import { achievementService } from "./achievement-service";

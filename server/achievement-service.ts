@@ -1,5 +1,5 @@
 import { storage } from "./storage";
-import { Achievement, InsertAchievement } from "@shared/schema";
+import { Achievement, InsertAchievement } from "../shared/schema";
 
 // Achievement types
 export enum AchievementType {

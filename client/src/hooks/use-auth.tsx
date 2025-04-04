@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest( "/api/logout");
+      await apiRequest("POST", "/api/logout");
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], null);

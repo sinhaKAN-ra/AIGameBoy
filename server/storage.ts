@@ -18,7 +18,7 @@ import {
   type InsertScore,
   type Achievement,
   type InsertAchievement
-} from "@shared/schema";
+} from "../shared/schema";
 
 // Memory store for session
 const MemoryStore = createMemoryStore(session);
