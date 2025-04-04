@@ -33,9 +33,10 @@ const Navbar = () => {
           <div className="flex items-center">
             <Link href="/" className="flex-shrink-0 flex items-center">
               <div className="w-10 h-10 bg-primary rounded-md flex items-center justify-center">
-                <span className="font-pixel text-sm">AI</span>
+                {/* <span className="font-pixel text-sm">AI</span> */}
+                <img src="/favicon.ico" alt="Logo" className="w-6 h-6" />
               </div>
-              <span className="ml-3 text-xl font-pixel text-white">AI Game Arcade</span>
+              <span className="ml-3 text-xl font-pixel text-white">AIGameBoy</span>
             </Link>
           </div>
           

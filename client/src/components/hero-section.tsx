@@ -11,7 +11,7 @@ const HeroSection = () => {
             <div className="sm:text-center lg:text-left">
               <h1 className="text-4xl tracking-tight font-extrabold text-white sm:text-5xl md:text-6xl">
                 <span className="block">Welcome to</span>
-                <span className="block text-primary">AI Games Hub</span>
+                <span className="block text-primary">AIGameBoy</span>
               </h1>
               <p className="mt-3 text-base text-gray-400 sm:mt-5 sm:text-lg sm:max-w-xl sm:mx-auto md:mt-5 md:text-xl lg:mx-0">
                 The first dedicated marketplace for games built with AI technology. Discover, play, and create the future of gaming.

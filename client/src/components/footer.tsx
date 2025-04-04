@@ -8,9 +8,9 @@ const Footer = () => {
           <div>
             <Link href="/" className="flex items-center mb-4">
               <div className="w-10 h-10 bg-primary rounded-md flex items-center justify-center">
-                <span className="font-pixel text-sm">AI</span>
+                <img src="/favicon.ico" alt="Logo" className="w-6 h-6" />
               </div>
-              <span className="ml-3 text-xl font-pixel text-white">AI Game Arcade</span>
+              <span className="ml-3 text-xl font-pixel text-white">AIGameBoy</span>
             </Link>
             <p className="text-sm text-gray-400 mb-4">
               Exploring the evolution of AI-generated games from retro to modern.
