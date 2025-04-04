@@ -11,6 +11,7 @@ import PlayersSection from "@/components/players-section";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { AiModel, Game, ModelVersion } from "@shared/schema";
+import { SeoMeta } from "@/components/seo/SeoMeta";
 
 const HomePage = () => {
   const { data: models, isLoading: isLoadingModels } = useQuery<AiModel[]>({
@@ -27,6 +28,11 @@ const HomePage = () => {
 
   return (
     <>
+      <SeoMeta 
+        title="Home" 
+        description="Experience the ultimate gaming platform with AiGameBoy. Play games created by leading AI models, compete on leaderboards, and create your own AI-powered games!"
+        canonicalUrl="/"
+      />
       <LaunchPromotionBanner />
       <HeroSection />
       <DevelopersSection />

@@ -3,10 +3,16 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
 import { Trophy, Users, Gamepad2, Sparkles, Calendar, Brain } from "lucide-react";
+import { SeoMeta } from "@/components/seo/SeoMeta";
 
 const AboutPage = () => {
   return (
     <div className="min-h-screen bg-[#121212] py-12">
+      <SeoMeta 
+        title="About Us" 
+        description="Learn about AiGameBoy's mission, our team, and how we're revolutionizing gaming with AI technology."
+        canonicalUrl="/about"
+      />
       <div className="container max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <h1 className="font-pixel text-3xl sm:text-4xl text-white mb-4">About AI Game Arcade</h1>
