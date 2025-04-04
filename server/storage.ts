@@ -15,7 +15,9 @@ import {
   type Game,
   type InsertGame,
   type Score,
-  type InsertScore
+  type InsertScore,
+  type Achievement,
+  type InsertAchievement
 } from "@shared/schema";
 
 // Memory store for session
@@ -29,6 +31,7 @@ export interface IStorage {
   updateUserAdmin(userId: number, isAdmin: boolean): Promise<User | undefined>;
   getUserCredits(userId: number): Promise<number>;
   updateUserCredits(userId: number, credits: number): Promise<User | undefined>;
+  updateUserProfile(userId: number, data: { username?: string; email?: string }): Promise<User | undefined>;
   
   // AI Model methods
   getAiModels(): Promise<AiModel[]>;
@@ -57,6 +60,14 @@ export interface IStorage {
   getTopScoresByGameId(gameId: number, limit: number): Promise<Score[]>;
   createScore(score: InsertScore): Promise<Score>;
   
+  // Achievement methods
+  getAchievements(): Promise<Achievement[]>;
+  getAchievementsByUserId(userId: number): Promise<Achievement[]>;
+  getAchievement(id: number): Promise<Achievement | undefined>;
+  createAchievement(achievement: InsertAchievement): Promise<Achievement>;
+  updateAchievement(id: number, achievement: Partial<InsertAchievement>): Promise<Achievement | undefined>;
+  deleteAchievement(id: number): Promise<boolean>;
+  
   // API Key methods
   getUserApiKey(userId: number): Promise<string | undefined>;
   createUserApiKey(userId: number): Promise<string>;
@@ -73,12 +84,14 @@ export class MemStorage implements IStorage {
   private games: Map<number, Game>;
   private scores: Map<number, Score>;
   private apiKeys: Map<number, string>; // Map userId to API key
+  private achievements: Map<number, Achievement>; // Map achievement ID to achievement
   
   currentUserId: number;
   currentModelId: number;
   currentVersionId: number;
   currentGameId: number;
   currentScoreId: number;
+  currentAchievementId: number;
   sessionStore: any; // Using any to avoid session type errors
 
   constructor() {
@@ -88,12 +101,14 @@ export class MemStorage implements IStorage {
     this.games = new Map();
     this.scores = new Map();
     this.apiKeys = new Map();
+    this.achievements = new Map();
     
     this.currentUserId = 1;
     this.currentModelId = 1;
     this.currentVersionId = 1;
     this.currentGameId = 1;
     this.currentScoreId = 1;
+    this.currentAchievementId = 1;
     
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000, // prune expired entries every 24h
@@ -404,13 +419,30 @@ export class MemStorage implements IStorage {
   }
   
   async getGamesByUserId(userId: number): Promise<Game[]> {
-    // Get all games created by this user (for now, there's no userId in Game)
+    console.log(`getGamesByUserId - User ID: ${userId}`);
+    
+    // Get all games created by this user
+    const allGames = Array.from(this.games.values());
+    console.log(`getGamesByUserId - Total games: ${allGames.length}`);
+    
+    // For now, we don't have a createdBy field in Game, so we'll use a workaround
     // In a real implementation, we'd add a createdBy field to Game
     const userScores = await this.getScoresByUserId(userId);
-    const gameIds = [...new Set(userScores.map(score => score.gameId).filter(id => id !== null) as number[])];
+    console.log(`getGamesByUserId - User scores: ${userScores.length}`);
     
-    return Promise.all(gameIds.map(id => this.getGame(id as number)))
-      .then(games => games.filter(game => game !== undefined) as Game[]);
+    const gameIds = [...new Set(userScores.map(score => score.gameId).filter(id => id !== null) as number[])];
+    console.log(`getGamesByUserId - Unique game IDs: ${gameIds.length}`);
+    
+    // Get games the user has played
+    const playedGames = await Promise.all(
+      gameIds.map(id => this.getGame(id as number))
+    ).then(games => games.filter(game => game !== undefined) as Game[]);
+    
+    console.log(`getGamesByUserId - Played games: ${playedGames.length}`);
+    
+    // For now, we'll return all games since we don't have a way to track which games were created by which user
+    // In a real implementation, we'd filter by createdBy
+    return allGames;
   }
   
   async getUserApiKey(userId: number): Promise<string | undefined> {
@@ -441,6 +473,19 @@ export class MemStorage implements IStorage {
     const updatedUser: User = { 
       ...user, 
       isAdmin 
+    };
+    this.users.set(userId, updatedUser);
+    return updatedUser;
+  }
+  
+  async updateUserProfile(userId: number, data: { username?: string; email?: string }): Promise<User | undefined> {
+    const user = await this.getUser(userId);
+    if (!user) return undefined;
+    
+    const updatedUser: User = {
+      ...user,
+      ...data,
+      updatedAt: new Date().toISOString(),
     };
     this.users.set(userId, updatedUser);
     return updatedUser;
@@ -579,9 +624,16 @@ export class MemStorage implements IStorage {
   }
   
   async getScoresByUserId(userId: number): Promise<Score[]> {
-    return Array.from(this.scores.values()).filter(
+    console.log(`getScoresByUserId - User ID: ${userId}`);
+    const allScores = Array.from(this.scores.values());
+    console.log(`getScoresByUserId - Total scores: ${allScores.length}`);
+    
+    const userScores = allScores.filter(
       (score) => score.userId === userId
     );
+    
+    console.log(`getScoresByUserId - User scores: ${userScores.length}`);
+    return userScores;
   }
   
   async getTopScoresByGameId(gameId: number, limit: number): Promise<Score[]> {
@@ -607,6 +659,55 @@ export class MemStorage implements IStorage {
     
     this.scores.set(id, newScore);
     return newScore;
+  }
+
+  // Achievement methods
+  async getAchievements(): Promise<Achievement[]> {
+    return Array.from(this.achievements.values());
+  }
+
+  async getAchievementsByUserId(userId: number): Promise<Achievement[]> {
+    return Array.from(this.achievements.values())
+      .filter(achievement => achievement.userId === userId);
+  }
+
+  async getAchievement(id: number): Promise<Achievement | undefined> {
+    return this.achievements.get(id);
+  }
+
+  async createAchievement(achievement: InsertAchievement): Promise<Achievement> {
+    const id = this.currentAchievementId++;
+    const now = new Date().toISOString();
+    
+    const newAchievement: Achievement = {
+      ...achievement,
+      id,
+      createdAt: now,
+      updatedAt: now,
+    };
+    
+    this.achievements.set(id, newAchievement);
+    return newAchievement;
+  }
+
+  async updateAchievement(id: number, achievement: Partial<InsertAchievement>): Promise<Achievement | undefined> {
+    const existingAchievement = this.achievements.get(id);
+    if (!existingAchievement) {
+      return undefined;
+    }
+    
+    const updatedAchievement: Achievement = {
+      ...existingAchievement,
+      ...achievement,
+      updatedAt: new Date().toISOString(),
+    };
+    
+    this.achievements.set(id, updatedAchievement);
+    return updatedAchievement;
+  }
+
+  async deleteAchievement(id: number): Promise<boolean> {
+    return this.achievements.delete(id);
   }
 }
 

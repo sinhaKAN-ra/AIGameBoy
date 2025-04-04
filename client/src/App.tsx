@@ -12,7 +12,7 @@ import AuthPage from "@/pages/auth-page";
 import ModelsPage from "@/pages/models-page";
 import ModelDetailPage from "@/pages/model-detail-page";
 import GamesPage from "@/pages/games-page";
-import GameDetailPage from "@/pages/game-detail-page";
+import GameDetailsPage from "@/pages/GameDetailsPage";
 import LeaderboardPage from "@/pages/leaderboard-page";
 import ProfilePage from "@/pages/profile-page";
 import AboutPage from "@/pages/about-page";
@@ -20,6 +20,9 @@ import PrivacyPage from "@/pages/privacy-page";
 import TermsPage from "@/pages/terms-page";
 import NotFound from "@/pages/not-found";
 import ApiDocsPage from "@/pages/api-docs-page";
+import CreateModelPage from "@/pages/create-model-page";
+import CreateVersionPage from "@/pages/create-version-page";
+import CreateGamePage from "@/pages/create-game-page";
 
 function Router() {
   return (
@@ -32,13 +35,16 @@ function Router() {
           <Route path="/models" component={ModelsPage} />
           <Route path="/models/:id" component={ModelDetailPage} />
           <Route path="/games" component={GamesPage} />
-          <Route path="/games/:id" component={GameDetailPage} />
+          <Route path="/games/:id" component={GameDetailsPage} />
           <Route path="/leaderboard" component={LeaderboardPage} />
           <ProtectedRoute path="/profile" component={ProfilePage} />
           <Route path="/api-docs" component={ApiDocsPage} />
           <Route path="/about" component={AboutPage} />
           <Route path="/privacy" component={PrivacyPage} />
           <Route path="/terms" component={TermsPage} />
+          <ProtectedRoute path="/create-model" component={() => <CreateModelPage />} />
+          <ProtectedRoute path="/create-version" component={() => <CreateVersionPage />} />
+          <ProtectedRoute path="/submit-game" component={() => <CreateGamePage />} />
           <Route component={NotFound} />
         </Switch>
       </main>

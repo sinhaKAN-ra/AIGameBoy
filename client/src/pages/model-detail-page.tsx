@@ -23,6 +23,7 @@ import {
 import { Loader2, ExternalLink, Calendar, Tag, Laptop, GitBranch } from "lucide-react";
 import GameCard from "@/components/game-card";
 import { AiModel, ModelVersion, Game } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
 
 const ModelDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -57,6 +58,14 @@ const ModelDetailPage = () => {
   // Fetch games for the selected version
   const { data: games, isLoading: gamesLoading } = useQuery<Game[]>({
     queryKey: [`/api/model-versions/${selectedVersionId}/games`],
+    queryFn: async () => {
+      if (!selectedVersionId) return [];
+      const res = await apiRequest("GET", `/api/model-versions/${selectedVersionId}/games`);
+      if (!res.ok) {
+        throw new Error("Failed to fetch games");
+      }
+      return await res.json();
+    },
     enabled: selectedVersionId !== null,
   });
 
@@ -214,7 +223,7 @@ const ModelDetailPage = () => {
                       Capabilities
                     </h3>
                     <div className="flex flex-wrap gap-2">
-                      {selectedVersion.capabilities.split(',').map((capability: string, index: number) => (
+                      {Array.isArray(selectedVersion.capabilities) && selectedVersion.capabilities.map((capability: string, index: number) => (
                         <Badge 
                           key={index}
                           variant="outline" 
@@ -247,7 +256,7 @@ const ModelDetailPage = () => {
           ) : games && games.length > 0 ? (
             <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
               {games.map(game => (
-                <GameCard key={game.id} game={game} aiModelName={model.name} />
+                <GameCard key={game.id} game={game} aiModelName={model.name} playerCount={0} />
               ))}
             </div>
           ) : (

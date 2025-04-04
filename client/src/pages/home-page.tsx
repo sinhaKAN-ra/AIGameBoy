@@ -5,9 +5,12 @@ import GameCard from "@/components/game-card";
 import TrendingGames from "@/components/trending-games";
 import LeaderboardTable from "@/components/leaderboard-table";
 import CallToAction from "@/components/call-to-action";
+import LaunchPromotionBanner from "@/components/launch-promotion-banner";
+import DevelopersSection from "@/components/developers-section";
+import PlayersSection from "@/components/players-section";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { AiModel, Game, Score } from "@shared/schema";
+import { AiModel, Game, ModelVersion } from "@shared/schema";
 
 const HomePage = () => {
   const { data: models, isLoading: isLoadingModels } = useQuery<AiModel[]>({
@@ -18,9 +21,16 @@ const HomePage = () => {
     queryKey: ['/api/games'],
   });
 
+  const { data: modelVersions, isLoading: isLoadingModelVersions } = useQuery<ModelVersion[]>({
+    queryKey: ['/api/model-versions'],
+  });
+
   return (
     <>
+      <LaunchPromotionBanner />
       <HeroSection />
+      <DevelopersSection />
+      <PlayersSection />
 
       {/* Featured AI Models */}
       <section id="models" className="py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -37,7 +47,7 @@ const HomePage = () => {
             <div className="flex-shrink-0 bg-[#2a2a2a] rounded-lg p-4 relative min-w-[280px] border border-gray-800">
               <h3 className="font-pixel text-sm text-[#ffc857] mb-2">Evolution Timeline</h3>
               <img 
-                src="https://images.unsplash.com/photo-1642483200566-0c646e6a3643" 
+                src="https://images.unsplash.com/photo-1550745165-9bc0b252726f" 
                 alt="AI Evolution Timeline" 
                 className="w-full h-32 object-cover rounded mb-2"
               />
@@ -88,12 +98,15 @@ const HomePage = () => {
               ))
             ) : (
               games?.slice(0, 3).map(game => {
-                const modelForGame = models?.find(m => m.id === game.aiModelId);
+                // Find the model version first
+                const modelVersion = modelVersions?.find(v => v.id === game.modelVersionId);
+                // Then find the model using the model version's modelId
+                const modelForGame = models?.find(m => m.id === modelVersion?.modelId);
                 return (
                   <GameCard 
                     key={game.id} 
                     game={game} 
-                    aiModelName={modelForGame?.name}
+                    aiModelName={modelForGame?.name || ''}
                     playerCount={Math.floor(Math.random() * 2000) + 500} // Simulated player count
                   />
                 );

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Card,
@@ -17,30 +17,83 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import LeaderboardTable from "@/components/leaderboard-table";
-import { Loader2, Trophy, Medal, Award } from "lucide-react";
+import { Loader2, Trophy, Medal, Award, Search, GamepadIcon } from "lucide-react";
 import { Game, Score } from "@shared/schema";
+import axios from "axios";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 
 interface ExtendedScore extends Score {
   username: string;
 }
 
+// Type guard to check if a game has a name
+const hasName = (game: Game): game is Game & { name: string } => {
+  return typeof game.name === 'string';
+};
+
+// Type guard to check if a game has an id
+const hasId = (game: Game): game is Game & { id: number } => {
+  return typeof game.id === 'number';
+};
+
+// Combined type guard for games with both id and name
+const isValidGame = (game: Game): game is Game & { id: number; name: string } => {
+  return hasId(game) && hasName(game);
+};
+
 const LeaderboardPage = () => {
   const [selectedGame, setSelectedGame] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [showGameSelector, setShowGameSelector] = useState<boolean>(false);
+  const [page, setPage] = useState<number>(1);
+  const itemsPerPage = 10;
 
   const { data: games, isLoading: gamesLoading } = useQuery<Game[]>({
     queryKey: ['/api/games'],
+    queryFn: async () => {
+      const response = await axios.get('/api/games');
+      return response.data;
+    }
   });
 
   const { data: scores, isLoading: scoresLoading } = useQuery<ExtendedScore[]>({
     queryKey: ['/api/scores'],
+    queryFn: async () => {
+      const response = await axios.get('/api/scores');
+      return response.data;
+    }
   });
 
   const isLoading = gamesLoading || scoresLoading;
 
   // Get scores for selected game or all scores
   const filteredScores = scores?.filter(score => 
-    selectedGame === "all" || score.gameId.toString() === selectedGame
+    selectedGame === "all" || (score.gameId && score.gameId.toString() === selectedGame)
   );
+
+  // Get game title safely
+  const getGameTitle = (gameId: string) => {
+    const game = games?.find(g => g.id && g.id.toString() === gameId);
+    return game?.name || 'Game';
+  };
+
+  // Filter games based on search term
+  const filteredGames = games?.filter(game => 
+    isValidGame(game) && game.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Group games by category for better organization
+  const groupedGames = useMemo(() => {
+    if (!games) return {};
+    return games.reduce((acc, game) => {
+      if (!isValidGame(game)) return acc;
+      const category = game.categories?.[0] || 'Other';
+      if (!acc[category]) acc[category] = [];
+      acc[category].push(game);
+      return acc;
+    }, {} as Record<string, Game[]>);
+  }, [games]);
 
   return (
     <div className="min-h-screen bg-[#121212] py-12">
@@ -52,22 +105,110 @@ const LeaderboardPage = () => {
           </p>
         </div>
         
-        <div className="flex justify-end mb-6">
-          <Select value={selectedGame} onValueChange={setSelectedGame}>
-            <SelectTrigger className="w-[250px] bg-[#2a2a2a] border-gray-700">
-              <SelectValue placeholder="Filter by game" />
-            </SelectTrigger>
-            <SelectContent className="bg-[#2a2a2a] border-gray-700">
-              <SelectItem value="all">All Games</SelectItem>
-              {games?.map(game => (
-                <SelectItem key={game.id} value={game.id.toString()}>{game.title}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+          <div className="relative w-full sm:w-auto">
+            <Button 
+              variant="outline" 
+              className="w-full sm:w-auto bg-[#2a2a2a] border-gray-700 text-white hover:bg-[#3a3a3a]"
+              onClick={() => setShowGameSelector(!showGameSelector)}
+            >
+              <GamepadIcon className="mr-2 h-4 w-4" />
+              {selectedGame === "all" ? "All Games" : getGameTitle(selectedGame)}
+            </Button>
+            
+            {showGameSelector && (
+              <div className="absolute z-10 mt-2 w-full sm:w-96 bg-[#2a2a2a] border border-gray-700 rounded-md shadow-lg">
+                <div className="p-2 border-b border-gray-700">
+                  <div className="relative">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search games..."
+                      className="pl-8 bg-[#1a1a1a] border-gray-700 text-white"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="max-h-[60vh] overflow-y-auto">
+                  <div className="p-2">
+                    <div 
+                      className={`p-2 rounded-md cursor-pointer hover:bg-[#3a3a3a] ${selectedGame === "all" ? "bg-[#3a3a3a]" : ""}`}
+                      onClick={() => {
+                        setSelectedGame("all");
+                        setShowGameSelector(false);
+                      }}
+                    >
+                      <div className="flex items-center">
+                        <GamepadIcon className="mr-2 h-4 w-4 text-primary" />
+                        <span className="text-white">All Games</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {Object.entries(groupedGames).map(([category, categoryGames]) => (
+                    <div key={category} className="p-2">
+                      <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2 px-2">
+                        {category}
+                      </div>
+                      {categoryGames
+                        .filter(game => game.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                        .map(game => (
+                          <div 
+                            key={game.id} 
+                            className={`p-2 rounded-md cursor-pointer hover:bg-[#3a3a3a] ${selectedGame === game.id?.toString() ? "bg-[#3a3a3a]" : ""}`}
+                            onClick={() => {
+                              if (game.id) {
+                                setSelectedGame(game.id.toString());
+                                setShowGameSelector(false);
+                              }
+                            }}
+                          >
+                            <div className="flex items-center">
+                              {game.imageUrl ? (
+                                <img 
+                                  src={game.imageUrl} 
+                                  alt={game.name} 
+                                  className="h-6 w-6 rounded-md object-cover mr-2"
+                                />
+                              ) : (
+                                <GamepadIcon className="mr-2 h-4 w-4 text-primary" />
+                              )}
+                              <div className="flex flex-col">
+                                <span className="text-white">{game.name}</span>
+                                <span className="text-xs text-gray-400">
+                                  {game.description?.slice(0, 50)}...
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  ))}
+                  
+                  {Object.values(groupedGames).flat().filter(game => 
+                    game.name.toLowerCase().includes(searchTerm.toLowerCase())
+                  ).length === 0 && (
+                    <div className="p-4 text-center text-gray-400">
+                      No games found matching "{searchTerm}"
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <div className="flex gap-2">
+            <Badge variant="outline" className="bg-[#2a2a2a] text-gray-300 border-gray-700">
+              {filteredScores?.length || 0} Scores
+            </Badge>
+            <Badge variant="outline" className="bg-[#2a2a2a] text-gray-300 border-gray-700">
+              {games?.length || 0} Games
+            </Badge>
+          </div>
         </div>
 
         <Tabs defaultValue="global" className="w-full">
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 bg-[#2a2a2a]">
+          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 gap-2 bg-[#2a2a2a]">
             <TabsTrigger value="global" className="font-pixel">Global Leaderboard</TabsTrigger>
             <TabsTrigger value="weekly" className="font-pixel">Weekly Champions</TabsTrigger>
           </TabsList>
@@ -80,7 +221,7 @@ const LeaderboardPage = () => {
                   <CardTitle className="text-white">
                     {selectedGame === "all" 
                       ? "All-Time Champions" 
-                      : `${games?.find(g => g.id.toString() === selectedGame)?.title || 'Game'} Champions`}
+                      : `${getGameTitle(selectedGame)} Champions`}
                   </CardTitle>
                 </div>
                 <CardDescription>
@@ -95,7 +236,12 @@ const LeaderboardPage = () => {
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   </div>
                 ) : (
-                  <LeaderboardTable gameId={selectedGame !== "all" ? parseInt(selectedGame) : undefined} />
+                  <LeaderboardTable 
+                    gameId={selectedGame !== "all" ? parseInt(selectedGame) : undefined} 
+                    page={page}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={setPage}
+                  />
                 )}
               </CardContent>
             </Card>
@@ -105,24 +251,33 @@ const LeaderboardPage = () => {
             <Card className="bg-[#2a2a2a] border-gray-800">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <Medal className="h-6 w-6 text-[#ffc857]" />
+                  <Trophy className="h-6 w-6 text-[#ffc857]" />
                   <CardTitle className="text-white">
-                    Weekly Champions
+                    {selectedGame === "all" 
+                      ? "Weekly Champions" 
+                      : `${getGameTitle(selectedGame)} Weekly Champions`}
                   </CardTitle>
                 </div>
                 <CardDescription>
-                  This week's top performers
+                  {selectedGame === "all" 
+                    ? "Top scores from the past 7 days across all AI-generated games" 
+                    : "Top players for this game in the past 7 days"}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8">
-                  <Award className="h-12 w-12 text-[#ffc857] mx-auto mb-4" />
-                  <h3 className="font-pixel text-lg text-white mb-2">Weekly Challenges Coming Soon!</h3>
-                  <p className="text-gray-400 max-w-md mx-auto">
-                    We're working on weekly tournaments and challenges. 
-                    Check back soon to compete for the weekly champion title!
-                  </p>
-                </div>
+                {isLoading ? (
+                  <div className="flex justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <LeaderboardTable 
+                    gameId={selectedGame !== "all" ? parseInt(selectedGame) : undefined} 
+                    timeframe="weekly"
+                    page={page}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={setPage}
+                  />
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -141,28 +296,25 @@ const LeaderboardPage = () => {
                   </div>
                   <h3 className="font-pixel text-white mb-2">Score Accuracy</h3>
                   <p className="text-gray-400 text-sm">
-                    All scores are verified and calculated by the game itself. 
-                    Scores are submitted automatically upon game completion.
-                  </p>
-                </div>
-                <div className="bg-[#121212] p-6 rounded-lg">
-                  <div className="w-12 h-12 bg-[#ff5e7d] rounded-full flex items-center justify-center mb-4">
-                    <Medal className="h-6 w-6 text-white" />
-                  </div>
-                  <h3 className="font-pixel text-white mb-2">Ranking System</h3>
-                  <p className="text-gray-400 text-sm">
-                    Leaderboards display the highest score achieved by each player.
-                    Play multiple times to improve your ranking.
+                    Your score is based on how well you perform in the game. Higher accuracy and better performance mean higher scores.
                   </p>
                 </div>
                 <div className="bg-[#121212] p-6 rounded-lg">
                   <div className="w-12 h-12 bg-[#ffc857] rounded-full flex items-center justify-center mb-4">
-                    <Award className="h-6 w-6 text-[#121212]" />
+                    <Medal className="h-6 w-6 text-white" />
                   </div>
-                  <h3 className="font-pixel text-white mb-2">Achievements</h3>
+                  <h3 className="font-pixel text-white mb-2">Time Bonus</h3>
                   <p className="text-gray-400 text-sm">
-                    Top performers may receive special recognition and badges
-                    on their profile. Keep playing to unlock achievements.
+                    Complete challenges faster to earn time bonuses. The quicker you finish, the more points you get.
+                  </p>
+                </div>
+                <div className="bg-[#121212] p-6 rounded-lg">
+                  <div className="w-12 h-12 bg-[#4ade80] rounded-full flex items-center justify-center mb-4">
+                    <Award className="h-6 w-6 text-white" />
+                  </div>
+                  <h3 className="font-pixel text-white mb-2">Achievement Multipliers</h3>
+                  <p className="text-gray-400 text-sm">
+                    Unlock achievements to earn score multipliers. Stack multiple achievements for even higher scores.
                   </p>
                 </div>
               </div>

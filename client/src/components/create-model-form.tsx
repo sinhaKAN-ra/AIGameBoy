@@ -15,13 +15,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
-import { insertAiModelSchema, InsertAiModel } from "@shared/schema";
+import { insertAiModelSchema, type AiModel } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 const CreateModelForm = ({ onSuccess }: { onSuccess?: () => void }) => {
   const { toast } = useToast();
 
-  const form = useForm<InsertAiModel>({
+  const form = useForm<AiModel>({
     resolver: zodResolver(insertAiModelSchema),
     defaultValues: {
       name: "",
@@ -33,7 +33,7 @@ const CreateModelForm = ({ onSuccess }: { onSuccess?: () => void }) => {
   });
 
   const createModelMutation = useMutation({
-    mutationFn: async (data: InsertAiModel) => {
+    mutationFn: async (data: AiModel) => {
       const res = await apiRequest("POST", "/api/models", data);
       return await res.json();
     },
@@ -57,7 +57,7 @@ const CreateModelForm = ({ onSuccess }: { onSuccess?: () => void }) => {
     }
   });
 
-  const onSubmit = (data: InsertAiModel) => {
+  const onSubmit = (data: AiModel) => {
     createModelMutation.mutate(data);
   };
 
@@ -126,7 +126,7 @@ const CreateModelForm = ({ onSuccess }: { onSuccess?: () => void }) => {
             <FormItem>
               <FormLabel>Logo URL (Optional)</FormLabel>
               <FormControl>
-                <Input placeholder="https://example.com/logo.png" {...field} />
+                <Input placeholder="https://example.com/logo.png" {...field} value={field.value || ""} />
               </FormControl>
               <FormDescription>
                 A URL to the model's logo image
@@ -143,7 +143,7 @@ const CreateModelForm = ({ onSuccess }: { onSuccess?: () => void }) => {
             <FormItem>
               <FormLabel>Website URL (Optional)</FormLabel>
               <FormControl>
-                <Input placeholder="https://example.com" {...field} />
+                <Input placeholder="https://example.com" {...field} value={field.value || ""} />
               </FormControl>
               <FormDescription>
                 The official website for this AI model

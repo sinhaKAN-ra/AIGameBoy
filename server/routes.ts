@@ -8,11 +8,17 @@ import {
   insertAiModelSchema,
   insertModelVersionSchema,
   insertGameSchema,
+  insertAchievementSchema,
   User, 
-  Game 
+  Game,
+  Achievement,
+  InsertAchievement,
+  insertUserSchema,
+  loginSchema
 } from "@shared/schema";
 import { z } from "zod";
 import crypto from "crypto";
+import { achievementService } from "./achievement-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication
@@ -73,8 +79,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) {
       return res.status(400).json({ message: "Invalid version ID" });
     }
+    console.log('id', id);
     
     const version = await storage.getModelVersion(id);
+    console.log('version', version);
     if (!version) {
       return res.status(404).json({ message: "Model version not found" });
     }
@@ -161,6 +169,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(game);
   });
 
+  // User Games API
+  app.get("/api/user/games", async (req, res) => {
+    console.log("GET /api/user/games - Request received");
+    
+    // Check if user is authenticated
+    if (!req.isAuthenticated()) {
+      console.log("GET /api/user/games - User not authenticated");
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    
+    const userId = (req.user as User).id;
+    console.log(`GET /api/user/games - User ID: ${userId}`);
+    
+    try {
+      const games = await storage.getGamesByUserId(userId);
+      console.log(`GET /api/user/games - Found ${games.length} games`);
+      res.json(games);
+    } catch (error) {
+      console.error("Error fetching user games:", error);
+      res.status(500).json({ message: "Failed to fetch user games" });
+    }
+  });
+
+  // User Scores API
+  app.get("/api/user/scores", async (req, res) => {
+    console.log("GET /api/user/scores - Request received");
+    
+    // Check if user is authenticated
+    if (!req.isAuthenticated()) {
+      console.log("GET /api/user/scores - User not authenticated");
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    
+    const userId = (req.user as User).id;
+    console.log(`GET /api/user/scores - User ID: ${userId}`);
+    
+    try {
+      const scores = await storage.getScoresByUserId(userId);
+      console.log(`GET /api/user/scores - Found ${scores.length} scores`);
+      res.json(scores);
+    } catch (error) {
+      console.error("Error fetching user scores:", error);
+      res.status(500).json({ message: "Failed to fetch user scores" });
+    }
+  });
+
+  // User Credits API
+  app.get("/api/user/credits", async (req, res) => {
+    // Check if user is authenticated
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    
+    const userId = (req.user as User).id;
+    const credits = await storage.getUserCredits(userId);
+    res.json({ credits });
+  });
+
   app.get("/api/models/:id/games", async (req, res) => {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -234,7 +300,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Scores API
   app.get("/api/scores", async (_req, res) => {
     const scores = await storage.getScores();
-    res.json(scores);
+    
+    // Join with user information and sort by score
+    const scoresWithUserInfo = await Promise.all(
+      scores.map(async (score) => {
+        const user = score.userId ? await storage.getUser(score.userId) : null;
+        return {
+          ...score,
+          username: user?.username || "Unknown",
+        };
+      })
+    );
+    
+    // Sort by score in descending order
+    scoresWithUserInfo.sort((a, b) => b.score - a.score);
+    
+    res.json(scoresWithUserInfo);
   });
 
   app.get("/api/games/:id/scores", async (req, res) => {
@@ -285,6 +366,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(scoresWithUserInfo);
   });
 
+  // Game Stats API
+  app.get("/api/games/:id/stats", async (req, res) => {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: "Invalid game ID" });
+    }
+    
+    try {
+      // Get all scores for this game
+      const scores = await storage.getScoresByGameId(id);
+      
+      // Calculate basic stats
+      const totalPlays = scores.length;
+      const totalScore = scores.reduce((sum, score) => sum + score.score, 0);
+      const averageScore = totalPlays > 0 ? totalScore / totalPlays : 0;
+      const highestScore = totalPlays > 0 ? Math.max(...scores.map(score => score.score)) : 0;
+      const lowestScore = totalPlays > 0 ? Math.min(...scores.map(score => score.score)) : 0;
+      
+      // Get recent scores (last 10)
+      const recentScores = [...scores]
+        .sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA;
+        })
+        .slice(0, 10);
+      
+      // Add user information to recent scores
+      const recentScoresWithUserInfo = await Promise.all(
+        recentScores.map(async (score) => {
+          const user = score.userId ? await storage.getUser(score.userId) : null;
+          return {
+            ...score,
+            user: {
+              username: user?.username || "Unknown",
+            },
+          };
+        })
+      );
+      
+      // Calculate score distribution
+      const scoreRanges = [
+        { min: 0, max: 20, label: "0-20" },
+        { min: 21, max: 40, label: "21-40" },
+        { min: 41, max: 60, label: "41-60" },
+        { min: 61, max: 80, label: "61-80" },
+        { min: 81, max: 100, label: "81-100" },
+        { min: 101, max: Infinity, label: "100+" },
+      ];
+      
+      const scoreDistribution = scoreRanges.map(range => {
+        const count = scores.filter(score => score.score >= range.min && score.score <= range.max).length;
+        return {
+          range: range.label,
+          count,
+        };
+      });
+      
+      // Return the stats
+      res.json({
+        totalPlays,
+        averageScore,
+        highestScore,
+        lowestScore,
+        recentScores: recentScoresWithUserInfo,
+        scoreDistribution,
+      });
+    } catch (error) {
+      console.error("Error calculating game stats:", error);
+      res.status(500).json({ message: "Failed to calculate game stats" });
+    }
+  });
+
   app.get("/api/users/:id/scores", async (req, res) => {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -314,12 +468,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             active: false,
             difficulty: null,
             tags: null,
-            createdAt: null
-          } as Game,
+            createdAt: null,
+            name: "Default",
+            categories: [],
+            aiIntegrationDetails: null
+          },
         };
       })
     );
-    
     // Sort by date, most recent first
     scoresWithGameInfo.sort((a, b) => {
       // Handle null dates by treating them as older than any actual date
@@ -369,6 +525,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const score = await storage.createScore(scoreData);
       
+      // Check and update achievements
+      const updatedAchievements = await achievementService.checkAndUpdateAchievements(userId);
+      
       // Reward the user with a small credit for playing the game (1 in 5 chance)
       if (Math.random() < 0.2) { // 20% chance to get a credit
         const user = await storage.getUser(userId);
@@ -378,7 +537,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      res.status(201).json(score);
+      res.status(201).json({
+        score,
+        achievements: updatedAchievements
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid score data", errors: error.errors });
@@ -417,18 +579,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ apiKey });
   });
   
-  // User credits management
-  app.get("/api/user/credits", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Authentication required" });
-    }
-    
-    const userId = req.user!.id;
-    const credits = await storage.getUserCredits(userId);
-    
-    res.json({ credits });
-  });
-  
   // This would be connected to a payment system in a real implementation
   app.post("/api/user/credits/purchase", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
@@ -452,7 +602,223 @@ export async function registerRoutes(app: Express): Promise<Server> {
       credits: newCredits
     });
   });
-  
+
+  // Achievement API
+  app.get("/api/achievements", async (_req, res) => {
+    const achievements = await storage.getAchievements();
+    res.json(achievements);
+  });
+
+  app.get("/api/achievements/:id", async (req, res) => {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: "Invalid achievement ID" });
+    }
+    
+    const achievement = await storage.getAchievement(id);
+    if (!achievement) {
+      return res.status(404).json({ message: "Achievement not found" });
+    }
+    
+    res.json(achievement);
+  });
+
+  app.get("/api/user/achievements", async (req, res) => {
+    // Check if user is authenticated
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    
+    const userId = (req.user as User).id;
+    const achievements = await storage.getAchievementsByUserId(userId);
+    res.json(achievements);
+  });
+
+  app.post("/api/achievements", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Validate the achievement data
+      const achievementData = insertAchievementSchema.parse(req.body);
+      
+      // Create the achievement
+      const achievement = await storage.createAchievement(achievementData);
+      
+      res.status(201).json(achievement);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid achievement data", errors: error.errors });
+      }
+      
+      console.error("Error creating achievement:", error);
+      res.status(500).json({ message: "Failed to create achievement" });
+    }
+  });
+
+  app.put("/api/achievements/:id", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const id = Number(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid achievement ID" });
+      }
+      
+      // Get the existing achievement
+      const existingAchievement = await storage.getAchievement(id);
+      if (!existingAchievement) {
+        return res.status(404).json({ message: "Achievement not found" });
+      }
+      
+      // Check if the user owns the achievement
+      const userId = (req.user as User).id;
+      if (existingAchievement.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to update this achievement" });
+      }
+      
+      // Update the achievement
+      const updatedAchievement = await storage.updateAchievement(id, req.body);
+      
+      res.json(updatedAchievement);
+    } catch (error) {
+      console.error("Error updating achievement:", error);
+      res.status(500).json({ message: "Failed to update achievement" });
+    }
+  });
+
+  app.delete("/api/achievements/:id", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const id = Number(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid achievement ID" });
+      }
+      
+      // Get the existing achievement
+      const existingAchievement = await storage.getAchievement(id);
+      if (!existingAchievement) {
+        return res.status(404).json({ message: "Achievement not found" });
+      }
+      
+      // Check if the user owns the achievement
+      const userId = (req.user as User).id;
+      if (existingAchievement.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to delete this achievement" });
+      }
+      
+      // Delete the achievement
+      const success = await storage.deleteAchievement(id);
+      
+      if (success) {
+        res.status(204).send();
+      } else {
+        res.status(500).json({ message: "Failed to delete achievement" });
+      }
+    } catch (error) {
+      console.error("Error deleting achievement:", error);
+      res.status(500).json({ message: "Failed to delete achievement" });
+    }
+  });
+
+  // Add a new endpoint to check achievements
+  app.post("/api/user/check-achievements", async (req: Request, res: Response) => {
+    try {
+      // Check if user is authenticated
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const userId = (req.user as User).id;
+      
+      // Check and update achievements
+      const updatedAchievements = await achievementService.checkAndUpdateAchievements(userId);
+      
+      res.json({ achievements: updatedAchievements });
+    } catch (error) {
+      console.error("Error checking achievements:", error);
+      res.status(500).json({ message: "Failed to check achievements" });
+    }
+  });
+
+  // Update user profile
+  app.put("/api/user/profile", async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const updateProfileSchema = z.object({
+        username: z.string().min(3).max(30).optional(),
+        email: z.string().email().optional(),
+      });
+
+      const result = updateProfileSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: "Invalid profile data", details: result.error.format() });
+      }
+
+      const { username, email } = result.data;
+      
+      // Check if username is already taken by another user
+      if (username) {
+        const existingUser = await storage.getUserByUsername(username);
+        if (existingUser && existingUser.id !== userId) {
+          return res.status(400).json({ error: "Username already taken" });
+        }
+      }
+
+      const updatedUser = await storage.updateUserProfile(userId, { username, email });
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      return res.status(200).json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user profile:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Weekly leaderboard
+  app.get("/api/scores/weekly", async (_req, res) => {
+    const scores = await storage.getScores();
+    
+    // Filter scores from the last 7 days
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    
+    const weeklyScores = scores.filter(score => 
+      score.createdAt && new Date(score.createdAt) >= oneWeekAgo
+    );
+    
+    // Join with user information and sort by score
+    const scoresWithUserInfo = await Promise.all(
+      weeklyScores.map(async (score) => {
+        const user = score.userId ? await storage.getUser(score.userId) : null;
+        return {
+          ...score,
+          username: user?.username || "Unknown",
+        };
+      })
+    );
+    
+    // Sort by score in descending order
+    scoresWithUserInfo.sort((a, b) => b.score - a.score);
+    
+    res.json(scoresWithUserInfo);
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

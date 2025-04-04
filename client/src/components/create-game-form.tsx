@@ -23,74 +23,219 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
-import { 
-  insertGameSchema, 
-  InsertGame, 
-  ModelVersion,
-  AiModel
-} from "@shared/schema";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Loader2, Plus } from "lucide-react";
+import { type Game, type AiModel, type ModelVersion, gameCategories, type GameCategory } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { z } from "zod";
+import * as z from "zod";
+import { useModels } from "@/hooks/use-models";
+import { Card, CardContent } from "@/components/ui/card";
+import { X } from "lucide-react";
 
-// Extend the schema with validation for tags input
-const createGameSchema = insertGameSchema.extend({
-  tags: z.string().optional(),
+const formSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  description: z.string().min(10, "Description must be at least 10 characters"),
+  modelVersionId: z.string().min(1, "Please select a model version"),
+  imageUrl: z.string().url("Please enter a valid URL").optional().or(z.literal("")),
+  gameUrl: z.string().url("Please enter a valid URL").optional().or(z.literal("")),
+  githubUrl: z.string().url("Please enter a valid URL").optional().or(z.literal("")),
+  documentationUrl: z.string().url("Please enter a valid URL").optional().or(z.literal("")),
+  categories: z.array(z.enum(gameCategories)).min(1, "Please select at least one category"),
+  aiIntegrationDetails: z.string().min(10, "AI integration details must be at least 10 characters"),
 });
 
-// Create a type that represents the form values
-type CreateGameFormValues = z.infer<typeof createGameSchema>;
+const modelFormSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  company: z.string().min(2, "Company name must be at least 2 characters"),
+  description: z.string().min(10, "Description must be at least 10 characters"),
+  logoUrl: z.string().url("Please enter a valid URL").optional().or(z.literal("")),
+  websiteUrl: z.string().url("Please enter a valid URL").optional().or(z.literal("")),
+});
 
-const CreateGameForm = ({ onSuccess }: { onSuccess?: () => void }) => {
+const versionFormSchema = z.object({
+  modelId: z.number(),
+  version: z.string().min(1, "Version is required"),
+  description: z.string().min(10, "Description must be at least 10 characters"),
+  capabilities: z.string().min(10, "Capabilities must be at least 10 characters"),
+  imageUrl: z.string().url("Please enter a valid URL").optional().or(z.literal("")),
+  isLatest: z.boolean().default(true),
+});
+
+type FormValues = z.infer<typeof formSchema>;
+type ModelFormValues = z.infer<typeof modelFormSchema>;
+type VersionFormValues = z.infer<typeof versionFormSchema>;
+
+interface CreateGameFormProps {
+  onSuccess?: () => void;
+}
+
+const CreateGameForm = ({ onSuccess }: CreateGameFormProps) => {
   const { toast } = useToast();
   const [selectedModelId, setSelectedModelId] = useState<number | null>(null);
   const [selectedVersionId, setSelectedVersionId] = useState<number | null>(null);
+  const [previewImages, setPreviewImages] = useState<string[]>([]);
+  const [newPreviewImage, setNewPreviewImage] = useState("");
+  const [isModelDialogOpen, setIsModelDialogOpen] = useState(false);
+  const [isVersionDialogOpen, setIsVersionDialogOpen] = useState(false);
 
   // Fetch available AI models
-  const { data: models, isLoading: modelsLoading } = useQuery<AiModel[]>({
-    queryKey: ['/api/models'],
+  const { data: models, isLoading: modelsLoading } = useModels();
+
+  // Fetch versions for selected model
+  const { data: versions, refetch: refetchVersions } = useQuery({
+    queryKey: ['model-versions', selectedModelId],
+    queryFn: async () => {
+      if (!selectedModelId) return [];
+      const res = await apiRequest(`/api/models/${selectedModelId}/versions`);
+      if (!res.ok) {
+        throw new Error('Failed to fetch versions');
+      }
+      const data = await res.json();
+      return data;
+    },
+    enabled: !!selectedModelId,
   });
 
-  // Fetch model versions when a model is selected
-  const { data: versions, isLoading: versionsLoading } = useQuery<ModelVersion[]>({
-    queryKey: [`/api/models/${selectedModelId}/versions`],
-    enabled: selectedModelId !== null,
-  });
-
-  const form = useForm<CreateGameFormValues>({
-    resolver: zodResolver(createGameSchema),
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
-      title: "",
+      name: "",
       description: "",
-      genre: "",
+      modelVersionId: "",
       imageUrl: "",
-      embedUrl: "",
-      modelVersionId: null,
-      difficulty: "Medium",
-      tags: "",
-      active: true
+      gameUrl: "",
+      githubUrl: "",
+      documentationUrl: "",
+      categories: [],
+      aiIntegrationDetails: "",
     },
   });
 
-  // Update modelVersionId in form when dropdown selection changes
-  useEffect(() => {
-    if (selectedVersionId) {
-      form.setValue('modelVersionId', selectedVersionId);
-    }
-  }, [selectedVersionId, form]);
+  const modelForm = useForm<ModelFormValues>({
+    resolver: zodResolver(modelFormSchema),
+    defaultValues: {
+      name: "",
+      company: "",
+      description: "",
+      logoUrl: "",
+      websiteUrl: "",
+    },
+  });
 
-  const createGameMutation = useMutation({
-    mutationFn: async (data: CreateGameFormValues) => {
-      // Process tags from comma-separated string to array
-      const processedData: InsertGame = {
+  const versionForm = useForm<VersionFormValues>({
+    resolver: zodResolver(versionFormSchema),
+    defaultValues: {
+      modelId: 0,
+      version: "",
+      description: "",
+      capabilities: "",
+      imageUrl: "",
+      isLatest: true,
+    },
+  });
+
+  // Update version form when model is selected
+  useEffect(() => {
+    if (selectedModelId) {
+      versionForm.setValue('modelId', selectedModelId);
+    }
+  }, [selectedModelId, versionForm]);
+
+  // Create model mutation
+  const createModelMutation = useMutation({
+    mutationFn: async (data: ModelFormValues) => {
+      const res = await apiRequest("POST", "/api/models", data);
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Model created",
+        description: "Your new AI model has been added successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/models'] });
+      setIsModelDialogOpen(false);
+      modelForm.reset();
+      // Set the model ID for version creation
+      versionForm.setValue('modelId', data.id);
+      setIsVersionDialogOpen(true);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to create model",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Create version mutation
+  const createVersionMutation = useMutation({
+    mutationFn: async (data: VersionFormValues) => {
+      // Convert capabilities string to array by splitting on newlines
+      const processedData = {
         ...data,
-        tags: data.tags ? data.tags.split(',').map(tag => tag.trim()) : [],
+        modelId: selectedModelId, // Ensure we use the selected model ID
+        capabilities: data.capabilities.split('\n').filter(cap => cap.trim().length > 0),
       };
       
-      // Remove the string version of tags that we added for the form
-      delete (processedData as any).tags;
+      const res = await apiRequest("POST", "/api/model-versions", processedData);
+      if (!res.ok) {
+        throw new Error('Failed to create version');
+      }
+      return await res.json();
+    },
+    onSuccess: async (data) => {
+      toast({
+        title: "Version created",
+        description: "Your new model version has been added successfully",
+      });
+      // Refetch versions for the current model
+      await refetchVersions();
+      setIsVersionDialogOpen(false);
+      versionForm.reset();
+      // Set the selected version ID in the game form
+      form.setValue('modelVersionId', data.id.toString());
+      setSelectedVersionId(data.id);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to create version",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Create game mutation
+  const createGameMutation = useMutation({
+    mutationFn: async (data: FormValues) => {
+      // Create a properly formatted game object
+      const gameData = {
+        name: data.name,
+        description: data.description,
+        modelVersionId: parseInt(data.modelVersionId, 10),
+        imageUrl: data.imageUrl || null,
+        gameUrl: data.gameUrl || null,
+        githubUrl: data.githubUrl || null,
+        documentationUrl: data.documentationUrl || null,
+        categories: data.categories,
+        aiIntegrationDetails: data.aiIntegrationDetails,
+        previewImages: previewImages.length > 0 ? previewImages : null,
+        active: true
+      };
       
-      const res = await apiRequest("POST", "/api/games", processedData);
+      const res = await apiRequest("POST", "/api/games", gameData);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Failed to create game');
+      }
       return await res.json();
     },
     onSuccess: () => {
@@ -105,6 +250,7 @@ const CreateGameForm = ({ onSuccess }: { onSuccess?: () => void }) => {
       form.reset();
       setSelectedModelId(null);
       setSelectedVersionId(null);
+      setPreviewImages([]);
       if (onSuccess) {
         onSuccess();
       }
@@ -118,8 +264,35 @@ const CreateGameForm = ({ onSuccess }: { onSuccess?: () => void }) => {
     }
   });
 
-  const onSubmit = (data: CreateGameFormValues) => {
+  const onSubmit = (data: FormValues) => {
+    if (!data.modelVersionId) {
+      toast({
+        title: "Missing model version",
+        description: "Please select a model version",
+        variant: "destructive",
+      });
+      return;
+    }
     createGameMutation.mutate(data);
+  };
+
+  const onModelSubmit = (data: ModelFormValues) => {
+    createModelMutation.mutate(data);
+  };
+
+  const onVersionSubmit = (data: VersionFormValues) => {
+    createVersionMutation.mutate(data);
+  };
+
+  const addPreviewImage = () => {
+    if (newPreviewImage && newPreviewImage.startsWith("http")) {
+      setPreviewImages([...previewImages, newPreviewImage]);
+      setNewPreviewImage("");
+    }
+  };
+
+  const removePreviewImage = (index: number) => {
+    setPreviewImages(previewImages.filter((_, i) => i !== index));
   };
 
   if (modelsLoading) {
@@ -130,252 +303,479 @@ const CreateGameForm = ({ onSuccess }: { onSuccess?: () => void }) => {
     );
   }
 
-  if (!models || models.length === 0) {
-    return (
-      <div className="text-center py-6">
-        <p className="text-gray-400 mb-4">
-          No AI models found. Please create an AI model first before adding a game.
-        </p>
-        <Button asChild className="mr-2">
-          <a href="/profile?tab=create-model">Create AI Model</a>
-        </Button>
-      </div>
-    );
-  }
-
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <FormLabel>Select AI Model</FormLabel>
-            <Select 
-              onValueChange={(value) => {
-                setSelectedModelId(parseInt(value));
-                setSelectedVersionId(null);
-              }}
-              value={selectedModelId?.toString()}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select an AI model" />
-              </SelectTrigger>
-              <SelectContent>
-                {models?.map((model) => (
-                  <SelectItem key={model.id} value={model.id.toString()}>
-                    {model.name} ({model.company})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+    <>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          <div className="flex items-center gap-4">
+            <FormField
+              control={form.control}
+              name="modelVersionId"
+              render={({ field }) => (
+                <FormItem className="flex-1">
+                  <FormLabel>AI Model Version</FormLabel>
+                  <div className="flex gap-2">
+                    <Select 
+                      onValueChange={(value) => {
+                        setSelectedModelId(parseInt(value, 10));
+                        field.onChange(""); // Reset version selection
+                      }}
+                      value={selectedModelId?.toString() || ""}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select an AI model" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {models?.map((model) => (
+                          <SelectItem key={model.id} value={model.id.toString()}>
+                            {model.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <div className="flex gap-2 flex-1">
+                      <Select 
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          setSelectedVersionId(parseInt(value, 10));
+                        }} 
+                        value={field.value}
+                        disabled={!selectedModelId}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a version" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {versions?.map((version: ModelVersion) => (
+                            <SelectItem key={version.id} value={version.id.toString()}>
+                              {version.version} {version.isLatest ? "(Latest)" : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      {selectedModelId && (
+                        <Dialog open={isVersionDialogOpen} onOpenChange={setIsVersionDialogOpen}>
+                          <DialogTrigger asChild>
+                            <Button type="button" variant="outline">
+                              <Plus className="h-4 w-4 mr-2" />
+                              New Version
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Create New Model Version</DialogTitle>
+                              <DialogDescription>
+                                Add a new version for {models?.find(m => m.id === selectedModelId)?.name}
+                              </DialogDescription>
+                            </DialogHeader>
+                            <Form {...versionForm}>
+                              <form onSubmit={versionForm.handleSubmit(onVersionSubmit)} className="space-y-4">
+                                <FormField
+                                  control={versionForm.control}
+                                  name="modelId"
+                                  render={({ field }) => (
+                                    <FormItem className="hidden">
+                                      <FormControl>
+                                        <Input {...field} type="hidden" value={selectedModelId || ""} />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={versionForm.control}
+                                  name="version"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Version</FormLabel>
+                                      <FormControl>
+                                        <Input placeholder="e.g., 1.0.0" {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={versionForm.control}
+                                  name="description"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Description</FormLabel>
+                                      <FormControl>
+                                        <Textarea 
+                                          placeholder="Describe the version"
+                                          className="min-h-[100px]"
+                                          {...field}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={versionForm.control}
+                                  name="capabilities"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Capabilities</FormLabel>
+                                      <FormDescription>
+                                        Enter each capability on a new line
+                                      </FormDescription>
+                                      <FormControl>
+                                        <Textarea 
+                                          placeholder="Enter capabilities (one per line)"
+                                          className="min-h-[100px]"
+                                          {...field}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={versionForm.control}
+                                  name="imageUrl"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Image URL</FormLabel>
+                                      <FormControl>
+                                        <Input placeholder="https://example.com/image.png" {...field} value={field.value || ""} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={versionForm.control}
+                                  name="isLatest"
+                                  render={({ field }) => (
+                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                      <div className="space-y-0.5">
+                                        <FormLabel className="text-base">Latest Version</FormLabel>
+                                        <FormDescription>
+                                          Mark this as the latest version of the model
+                                        </FormDescription>
+                                      </div>
+                                      <FormControl>
+                                        <Switch
+                                          checked={field.value}
+                                          onCheckedChange={field.onChange}
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                                <Button type="submit" className="w-full">
+                                  Create Version
+                                </Button>
+                              </form>
+                            </Form>
+                          </DialogContent>
+                        </Dialog>
+                      )}
+                    </div>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Dialog open={isModelDialogOpen} onOpenChange={setIsModelDialogOpen}>
+              <DialogTrigger asChild>
+                <Button type="button" variant="outline" className="mt-8">
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Model
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New AI Model</DialogTitle>
+                  <DialogDescription>
+                    Add a new AI model to the platform
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...modelForm}>
+                  <form onSubmit={modelForm.handleSubmit(onModelSubmit)} className="space-y-4">
+                    <FormField
+                      control={modelForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Model Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter model name" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={modelForm.control}
+                      name="company"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Company</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter company name" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={modelForm.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Describe the model"
+                              className="min-h-[100px]"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={modelForm.control}
+                      name="logoUrl"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Logo URL</FormLabel>
+                          <FormControl>
+                            <Input placeholder="https://example.com/logo.png" {...field} value={field.value || ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={modelForm.control}
+                      name="websiteUrl"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Website URL</FormLabel>
+                          <FormControl>
+                            <Input placeholder="https://example.com" {...field} value={field.value || ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button type="submit" className="w-full">
+                      Create Model
+                    </Button>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
           </div>
+
+          {/* Rest of the game form fields */}
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Game Name</FormLabel>
+                <FormControl>
+                  <Input placeholder="Enter game name" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
           
           <FormField
             control={form.control}
-            name="modelVersionId"
+            name="description"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Model Version</FormLabel>
-                <Select 
-                  onValueChange={(value) => setSelectedVersionId(parseInt(value))}
-                  value={selectedVersionId?.toString()}
-                  disabled={!selectedModelId || versionsLoading}
+                <FormLabel>Description</FormLabel>
+                <FormControl>
+                  <Textarea 
+                    placeholder="Describe your game"
+                    className="min-h-[100px]"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={form.control}
+            name="imageUrl"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Main Image URL</FormLabel>
+                <FormControl>
+                  <Input placeholder="https://example.com/image.jpg" {...field} value={field.value || ""} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <div className="space-y-4">
+            <FormLabel>Preview Images</FormLabel>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {previewImages.map((url, index) => (
+                <Card key={index}>
+                  <CardContent className="p-4 relative">
+                    <img src={url} alt={`Preview ${index + 1}`} className="w-full h-32 object-cover rounded" />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-2 right-2"
+                      onClick={() => removePreviewImage(index)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Add preview image URL"
+                value={newPreviewImage}
+                onChange={(e) => setNewPreviewImage(e.target.value)}
+              />
+              <Button type="button" onClick={addPreviewImage}>
+                Add
+              </Button>
+            </div>
+          </div>
+
+          <FormField
+            control={form.control}
+            name="gameUrl"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Game URL</FormLabel>
+                <FormControl>
+                  <Input placeholder="https://example.com/game" {...field} value={field.value || ""} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="githubUrl"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>GitHub URL</FormLabel>
+                <FormControl>
+                  <Input placeholder="https://github.com/username/repo" {...field} value={field.value || ""} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="documentationUrl"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Documentation URL</FormLabel>
+                <FormControl>
+                  <Input placeholder="https://example.com/docs" {...field} value={field.value || ""} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="categories"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Categories</FormLabel>
+                <Select
+                  onValueChange={(value: GameCategory) => {
+                    const currentCategories = field.value || [];
+                    if (!currentCategories.includes(value)) {
+                      field.onChange([...currentCategories, value]);
+                    }
+                  }}
                 >
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder={versionsLoading ? "Loading..." : "Select a version"} />
+                      <SelectValue placeholder="Select categories" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {versions?.map((version) => (
-                      <SelectItem key={version.id} value={version.id.toString()}>
-                        {version.version} {version.isLatest ? "(Latest)" : ""}
+                    {gameCategories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <FormDescription>
-                  The model version used to create this game
-                </FormDescription>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {field.value?.map((category) => (
+                    <div
+                      key={category}
+                      className="flex items-center gap-1 bg-secondary text-secondary-foreground px-2 py-1 rounded-md"
+                    >
+                      {category}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-4 w-4 p-0"
+                        onClick={() => {
+                          field.onChange(field.value?.filter((c) => c !== category));
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
                 <FormMessage />
               </FormItem>
             )}
           />
-        </div>
-        
-        <FormField
-          control={form.control}
-          name="title"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Game Title</FormLabel>
-              <FormControl>
-                <Input placeholder="Enter game title" {...field} />
-              </FormControl>
-              <FormDescription>
-                The name of your game
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Description</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Describe your game..."
-                  className="min-h-[120px]"
-                  {...field}
-                />
-              </FormControl>
-              <FormDescription>
-                Provide details about how to play and what makes it fun
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
           <FormField
             control={form.control}
-            name="genre"
+            name="aiIntegrationDetails"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Genre</FormLabel>
+                <FormLabel>AI Integration Details</FormLabel>
                 <FormControl>
-                  <Input placeholder="Puzzle, Action, Strategy, etc." {...field} />
+                  <Textarea 
+                    placeholder="Describe how the AI is integrated into your game"
+                    className="min-h-[100px]"
+                    {...field}
+                  />
                 </FormControl>
-                <FormDescription>
-                  The game's category or genre
-                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
-          
-          <FormField
-            control={form.control}
-            name="difficulty"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Difficulty</FormLabel>
-                <Select 
-                  onValueChange={field.onChange}
-                  value={field.value}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select difficulty" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="Easy">Easy</SelectItem>
-                    <SelectItem value="Medium">Medium</SelectItem>
-                    <SelectItem value="Hard">Hard</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormDescription>
-                  How challenging is your game?
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-        
-        <FormField
-          control={form.control}
-          name="tags"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Tags</FormLabel>
-              <FormControl>
-                <Input placeholder="AI, 2D, Puzzle, Multiplayer (comma-separated)" {...field} />
-              </FormControl>
-              <FormDescription>
-                Comma-separated tags to help categorize your game
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <FormField
-          control={form.control}
-          name="imageUrl"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Image URL (Optional)</FormLabel>
-              <FormControl>
-                <Input placeholder="https://example.com/image.png" {...field} />
-              </FormControl>
-              <FormDescription>
-                A URL to the game's thumbnail or screenshot
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <FormField
-          control={form.control}
-          name="embedUrl"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Game URL</FormLabel>
-              <FormControl>
-                <Input placeholder="https://your-game-url.com" {...field} />
-              </FormControl>
-              <FormDescription>
-                The URL where your game can be played
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <FormField
-          control={form.control}
-          name="active"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-              <div className="space-y-0.5">
-                <FormLabel className="text-base">Active</FormLabel>
-                <FormDescription>
-                  Whether this game is currently available for play
-                </FormDescription>
-              </div>
-              <FormControl>
-                <Switch
-                  checked={field.value as boolean}
-                  onCheckedChange={field.onChange}
-                />
-              </FormControl>
-            </FormItem>
-          )}
-        />
-        
-        <Button 
-          type="submit" 
-          className="w-full"
-          disabled={createGameMutation.isPending || !selectedVersionId}
-        >
-          {createGameMutation.isPending ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Creating...
-            </>
-          ) : (
-            "Create Game"
-          )}
-        </Button>
-      </form>
-    </Form>
+
+          <Button type="submit" className="w-full">
+            Create Game
+          </Button>
+        </form>
+      </Form>
+    </>
   );
 };
 

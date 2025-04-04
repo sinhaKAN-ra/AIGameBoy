@@ -21,6 +21,8 @@ export const aiModels = pgTable("ai_models", {
   description: text("description").notNull(),
   logoUrl: text("logo_url"),
   websiteUrl: text("website_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // AI Model Versions
@@ -30,24 +32,41 @@ export const modelVersions = pgTable("model_versions", {
   version: text("version").notNull(),
   releaseDate: timestamp("release_date").defaultNow(),
   description: text("description").notNull(),
-  capabilities: text("capabilities"),
+  capabilities: text("capabilities").array(),
   imageUrl: text("image_url"),
   isLatest: boolean("is_latest").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+export const gameCategories = [
+  "Text Adventure",
+  "Strategy",
+  "Puzzle",
+  "RPG",
+  "Educational",
+  "Simulation",
+  "Other",
+] as const;
+
+export type GameCategory = typeof gameCategories[number];
 
 // Game
 export const games = pgTable("games", {
   id: serial("id").primaryKey(),
-  title: text("title").notNull(),
+  name: text("name").notNull(),
   description: text("description").notNull(),
-  genre: text("genre").notNull(),
+  modelVersionId: integer("model_version_id").references(() => modelVersions.id).notNull(),
   imageUrl: text("image_url"),
-  embedUrl: text("embed_url"),
-  modelVersionId: integer("model_version_id").references(() => modelVersions.id),
+  previewImages: text("preview_images").array(),
+  gameUrl: text("game_url"),
+  githubUrl: text("github_url"),
+  documentationUrl: text("documentation_url"),
+  categories: text("categories").array(),
+  aiIntegrationDetails: text("ai_integration_details").notNull(),
   active: boolean("active").default(true),
-  difficulty: text("difficulty").default("medium"),
-  tags: text("tags").array(),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Score
@@ -91,18 +110,62 @@ export const scoreSubmissionSchema = z.object({
   apiKey: z.string().optional(),
 });
 
+// Achievement schema
+export const insertAchievementSchema = z.object({
+  userId: z.number(),
+  title: z.string().min(1, "Title is required"),
+  description: z.string().min(1, "Description is required"),
+  icon: z.string().min(1, "Icon is required"),
+  progress: z.number().min(0).max(100),
+  completed: z.boolean(),
+  completedAt: z.string().optional(),
+});
+
+// Achievement type
+export type Achievement = {
+  id?: number;
+  userId: number;
+  title: string;
+  description: string;
+  icon: string;
+  progress: number;
+  completed: boolean;
+  completedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type InsertAchievement = z.infer<typeof insertAchievementSchema>;
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Login = z.infer<typeof loginSchema>;
 
-export type AiModel = typeof aiModels.$inferSelect;
-export type InsertAiModel = z.infer<typeof insertAiModelSchema>;
+export type AiModel = typeof aiModels.$inferSelect & {
+  versions?: ModelVersion[];
+};
 
 export type ModelVersion = typeof modelVersions.$inferSelect;
 export type InsertModelVersion = z.infer<typeof insertModelVersionSchema>;
 
-export type Game = typeof games.$inferSelect;
+export type Game = {
+  id?: number;
+  name: string;
+  description: string;
+  modelVersionId: number;
+  imageUrl?: string | null;
+  previewImages?: string[];
+  gameUrl?: string | null;
+  githubUrl?: string | null;
+  documentationUrl?: string | null;
+  categories: string[];
+  aiIntegrationDetails: string;
+  active?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type InsertGame = z.infer<typeof insertGameSchema>;
 
 export type Score = typeof scores.$inferSelect;

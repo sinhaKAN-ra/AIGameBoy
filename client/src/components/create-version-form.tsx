@@ -47,7 +47,7 @@ const CreateVersionForm = ({ onSuccess }: { onSuccess?: () => void }) => {
       version: "",
       description: "",
       releaseDate: new Date(),
-      capabilities: "",
+      capabilities: [],
       imageUrl: "",
       isLatest: true
     },
@@ -196,6 +196,7 @@ const CreateVersionForm = ({ onSuccess }: { onSuccess?: () => void }) => {
                 <Textarea
                   placeholder="Text generation, image analysis, reasoning, etc. (comma-separated)"
                   {...field}
+                  value={field.value || ""}
                 />
               </FormControl>
               <FormDescription>
@@ -218,7 +219,7 @@ const CreateVersionForm = ({ onSuccess }: { onSuccess?: () => void }) => {
                   {...field} 
                   value={field.value instanceof Date 
                     ? field.value.toISOString().slice(0, 10) 
-                    : field.value
+                    : field.value || ""
                   }
                   onChange={e => {
                     field.onChange(new Date(e.target.value));
@@ -240,7 +241,7 @@ const CreateVersionForm = ({ onSuccess }: { onSuccess?: () => void }) => {
             <FormItem>
               <FormLabel>Image URL (Optional)</FormLabel>
               <FormControl>
-                <Input placeholder="https://example.com/image.png" {...field} />
+                <Input placeholder="https://example.com/image.png" {...field} value={field.value || ""} />
               </FormControl>
               <FormDescription>
                 A URL to an image representing this version
