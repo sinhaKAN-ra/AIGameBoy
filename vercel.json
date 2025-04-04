@@ -6,6 +6,18 @@
       {
         "src": "dist/index.js",
         "use": "@vercel/node"
+      },
+      {
+        "src": "index.html",
+        "use": "@vercel/static"
+      },
+      {
+        "src": "client/dist/index.html",
+        "use": "@vercel/static"
+      },
+      {
+        "src": "client/dist/client/static/**/*",
+        "use": "@vercel/static"
       }
     ],
     "routes": [
